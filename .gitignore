@@ -1,0 +1,35 @@
+# Ignore environment variables
+.env
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Generated outputs
+generated_mcqs*.md
+test_output.md
+sample_content.md
+
+# Logs
+*.log
+
+# Graph visualizations
+*.png
+*.pdf
+
+# OS files
+.DS_Store
+Thumbs.db

@@ -1,0 +1,33 @@
+digraph MCQGenerator {
+    // Graph settings
+    rankdir=TB;
+    node [shape=box, style="rounded,filled", fillcolor="#f2f0ff", fontname="Arial", fontsize=11];
+    edge [fontname="Arial", fontsize=10];
+    
+    // Start/End nodes
+    start [label="START", shape=oval, fillcolor="#bfb6fc", fontsize=12, penwidth=2];
+    end [label="END", shape=oval, fillcolor="#bfb6fc", fontsize=12, penwidth=2];
+    
+    // Regular nodes
+    analyzer [label="Analyzer\nExtract Concepts"];
+    stem_gen [label="Stem Generator\nGenerate Questions\n(Batch: 10-15 concepts)"];
+    validator [label="Validator\nVerify & Correct"];
+    distractor_gen [label="Distractor Generator\nCreate Wrong Options"];
+    assembler [label="Assembler\nShuffle & Format"];
+    
+    // Conditional node (diamond shape)
+    condition [label="needs_more_batches?\nCheck Queue Status", shape=diamond, fillcolor="#FEF3C7", penwidth=2, color="#F59E0B"];
+    
+    // Edges
+    start -> analyzer;
+    analyzer -> stem_gen;
+    stem_gen -> condition;
+    condition -> stem_gen [label="True\n(Queue not empty)", color="#DC2626", fontcolor="#DC2626", penwidth=2];
+    condition -> validator [label="False\n(Queue empty)", color="#16A34A", fontcolor="#16A34A", penwidth=2];
+    validator -> distractor_gen;
+    distractor_gen -> assembler;
+    assembler -> end;
+    
+    // Invisible edges for better layout
+    {rank=same; condition; stem_gen;}
+}

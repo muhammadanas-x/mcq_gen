@@ -1,0 +1,29 @@
+%%{init: {'theme':'base', 'themeVariables': { 'primaryColor':'#f2f0ff','primaryTextColor':'#000','primaryBorderColor':'#7C3AED','lineColor':'#7C3AED','secondaryColor':'#FEF3C7','tertiaryColor':'#fff'}}}%%
+graph TD
+    Start([START]):::startEnd
+    Analyzer[Analyzer<br/>Extract Concepts]:::node
+    StemGen[Stem Generator<br/>Generate Questions<br/>Batch: 10-15 concepts]:::node
+    Condition{needs_more_batches?<br/>Check Queue}:::condition
+    Validator[Validator<br/>Verify & Correct]:::node
+    DistractorGen[Distractor Generator<br/>Create Wrong Options]:::node
+    Assembler[Assembler<br/>Shuffle & Format]:::node
+    End([END]):::startEnd
+    
+    Start --> Analyzer
+    Analyzer --> StemGen
+    StemGen --> Condition
+    Condition -->|True<br/>Queue not empty| StemGen
+    Condition -->|False<br/>Queue empty| Validator
+    Validator --> DistractorGen
+    DistractorGen --> Assembler
+    Assembler --> End
+    
+    classDef startEnd fill:#bfb6fc,stroke:#7C3AED,stroke-width:3px,color:#000
+    classDef node fill:#f2f0ff,stroke:#7C3AED,stroke-width:2px,color:#000
+    classDef condition fill:#FEF3C7,stroke:#F59E0B,stroke-width:3px,color:#000,font-weight:bold
+    
+    %% Add notes
+    note1[Loop back for<br/>next batch]:::note
+    note2[All concepts<br/>processed]:::note
+    
+    classDef note fill:#E0F2FE,stroke:#0EA5E9,stroke-width:1px,stroke-dasharray: 5 5,color:#000,font-size:11px
