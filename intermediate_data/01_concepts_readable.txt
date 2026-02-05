@@ -1,544 +1,872 @@
 ================================================================================
 CONTENT ANALYZER - EXTRACTED CONCEPTS
 ================================================================================
-Timestamp: 2025-12-16 20:54:50
-Input Source: ../chap3_fung_mcqs.md
+Timestamp: 2026-02-05 16:35:41
+Input Source: C:\Users\midni\AppData\Local\Temp\tmpq6gz9f3c.md
 Input Type: mcqs
-LLM Provider: gemini
-Model: gemini-2.5-pro
-Total Concepts Extracted: 30
+LLM Provider: groq
+Model: openai/gpt-oss-120b
+Total Concepts Extracted: 60
 ================================================================================
 
 DIFFICULTY DISTRIBUTION:
 --------------------------------------------------------------------------------
-  EASY: 12 concepts
-  MEDIUM: 17 concepts
-  HARD: 1 concepts
+  EASY: 29 concepts
+  MEDIUM: 21 concepts
+  HARD: 10 concepts
 
 
 ================================================================================
-CONCEPT 1: Power Rule for Integration
+CONCEPT 1: Power Rule for Indefinite Integration
 ================================================================================
 ID: power_rule_integration
 Difficulty: easy
+Prerequisites: basic_algebra, exponents
 
 Context:
-This is the fundamental rule for finding the antiderivative of a variable raised to a constant power. It is the reverse of the power rule for differentiation and is used extensively in integrating polynomial functions.
+Use this rule to integrate monomials of the form x^n. It is the most fundamental integration technique taught early in calculus.
 
 Formula:
-\int x^n dx = \frac{x^{n+1}}{n+1} + C, \text{ for } n \neq -1
+\int x^{n}\,dx = \frac{x^{n+1}}{n+1}+C \quad (n \neq -1)
 
 Worked Example:
-Problem: Find \int x^4 dx.
-Solution: Using the power rule with n=4, we get \frac{x^{4+1}}{4+1} + C = \frac{x^5}{5} + C.
+\int \frac{a}{x^{n}}\,dx = \int a x^{-n}\,dx = \frac{a x^{1-n}}{1-n}+C
 
 
 ================================================================================
-CONCEPT 2: Integration of 1/x
+CONCEPT 2: Integrating \(\cos^2(ax)\) Using Power‑Reduction Identity
 ================================================================================
-ID: integration_of_one_over_x
+ID: integration_cos_squared
+Difficulty: medium
+Prerequisites: trigonometric_identities, basic_integration
+
+Context:
+Apply the identity \(\cos^2\theta = \frac{1+\cos 2\theta}{2}\) before integrating.
+
+Formula:
+\int \cos^2(ax)\,dx = \frac{x}{2}+\frac{\sin(2ax)}{4a}+C
+
+Worked Example:
+For \(\int \cos^2(3x)\,dx\) we get \(\frac{x}{2}+\frac{\sin 6x}{12}+C\).
+
+
+================================================================================
+CONCEPT 3: Integrating Products Involving \(e^x\) and a Function Whose Derivative Appears
+================================================================================
+ID: integration_by_recognizing_derivative
+Difficulty: medium
+Prerequisites: product_rule, chain_rule, basic_integration
+
+Context:
+If the integrand is \(e^x\) times a sum of a function and its derivative, the antiderivative is simply \(e^x\) times the function.
+
+Formula:
+\int e^x\bigl(f(x)+f'(x)\bigr)\,dx = e^x f(x)+C
+
+Worked Example:
+Given \(\int e^x\bigl(\tan^{-1}x+\frac{1}{1+x^2}\bigr)dx\), note that \(\frac{d}{dx}\tan^{-1}x=\frac{1}{1+x^2}\); thus the integral equals \(e^x\tan^{-1}x+C\).
+
+
+================================================================================
+CONCEPT 4: Using Even/Odd Symmetry for Definite Integrals over Symmetric Limits
+================================================================================
+ID: definite_integral_odd_even_symmetry
+Difficulty: easy
+Prerequisites: function_symmetry, definite_integrals
+
+Context:
+Identify whether the integrand is odd or even to simplify the evaluation of integrals with limits \(-a\) to \(a\).
+
+Formula:
+If \(f\) is odd, \(\int_{-a}^{a} f(x)\,dx = 0;\quad\text{if }f\text{ is even}, \int_{-a}^{a} f(x)\,dx = 2\int_{0}^{a} f(x)\,dx
+
+Worked Example:
+Since \(\sec^3 x\) is an odd function, \(\int_{-\pi/6}^{\pi/6}\sec^3 x\,dx = 0\).
+
+
+================================================================================
+CONCEPT 5: Evaluating Definite Integrals of Polynomials
+================================================================================
+ID: definite_integral_polynomial
+Difficulty: easy
+Prerequisites: power_rule_integration, fundamental_theorem_of_calculus
+
+Context:
+Expand the polynomial, integrate term‑wise, then apply the limits.
+
+Formula:
+\int_{a}^{b} (x+1)^2\,dx = \left[\frac{x^3}{3}+x^2+x\right]_{a}^{b}
+
+Worked Example:
+For \(\int_{0}^{1}(x+1)^2dx\) we obtain \(\frac{8}{3}\).
+
+
+================================================================================
+CONCEPT 6: Linearity and Additivity of Definite Integrals
+================================================================================
+ID: linearity_of_definite_integral
+Difficulty: easy
+Prerequisites: properties_of_integrals
+
+Context:
+These properties allow splitting integrals and pulling constants outside.
+
+Formula:
+\int_a^b c\,f(x)\,dx = c\int_a^b f(x)\,dx;\quad \int_a^b [f(x)+g(x)]\,dx = \int_a^b f(x)\,dx+\int_a^b g(x)\,dx
+
+Worked Example:
+Given \(\int_1^3 g(x)dx=-3\) and \(\int_3^8 g(x)dx=10\), then \(\int_1^8 3g(x)dx = 3[(-3)+10]=21\).
+
+
+================================================================================
+CONCEPT 7: Integrating Powers of \(\tan x\) Using \(\tan^2 x = \sec^2 x-1\)
+================================================================================
+ID: integrating_tan_powers
+Difficulty: medium
+Prerequisites: trigonometric_identities, u_substitution
+
+Context:
+When the integrand contains \(\tan^n x\) together with \(\sec^2 x\), a simple substitution works.
+
+Formula:
+Replace \(\tan^2 x\) with \(\sec^2 x-1\) and use substitution \(u=\tan x\).
+
+Worked Example:
+\(\int (\tan^4 x+\tan^2 x)dx = \int \tan^2 x(\tan^2 x+1)dx = \int \tan^2 x\sec^2 x dx\). Let \(u=\tan x\); then \(du=\sec^2 xdx\) and the integral becomes \(\int u^2 du = \frac{u^3}{3}+C = \frac{\tan^3 x}{3}+C\).
+
+
+================================================================================
+CONCEPT 8: Antiderivative of a Polynomial Function
+================================================================================
+ID: basic_antiderivative_polynomial
 Difficulty: easy
 Prerequisites: power_rule_integration
 
 Context:
-This rule covers the specific case of the power rule where n = -1. The integral of 1/x is the natural logarithm of the absolute value of x, a crucial formula in calculus.
+Direct application of the power rule to each term of a polynomial.
 
 Formula:
-\int \frac{1}{x} dx = \ln|x| + C
+\int (x^n)\,dx = \frac{x^{n+1}}{n+1}+C
 
 Worked Example:
-Problem: Find \int \frac{5}{x} dx.
-Solution: Using the constant multiple rule and the rule for 1/x, we get 5 \int \frac{1}{x} dx = 5 \ln|x| + C.
+For \(\frac{dy}{dx}=x^4+12\), integrate to obtain \(y=\frac{x^5}{5}+12x+C\).
 
 
 ================================================================================
-CONCEPT 3: Constant Multiple Rule for Integration
+CONCEPT 9: Identifying Incorrect Integration Formulas
 ================================================================================
-ID: constant_multiple_rule_integration
-Difficulty: easy
+ID: false_statement_integration_property
+Difficulty: medium
+Prerequisites: integration_rules, algebraic_manipulation
 
 Context:
-This property allows constant factors to be moved outside of the integral sign, simplifying the integration process. It applies to both definite and indefinite integrals.
-
-Formula:
-\int k f(x) dx = k \int f(x) dx
-
-Worked Example:
-Problem: Find \int 3\cos(x) dx.
-Solution: We can pull the constant 3 out: 3 \int \cos(x) dx = 3\sin(x) + C.
+Test knowledge of standard integration properties; the statement \(\int e^x(f+f')dx = e^x f'\) is false because the correct result is \(e^x f\).
 
 
 ================================================================================
-CONCEPT 4: Sum and Difference Rule for Integration
+CONCEPT 10: Order and Number of Arbitrary Constants in a Differential Equation
 ================================================================================
-ID: sum_difference_rule_integration
+ID: order_of_differential_equation
 Difficulty: easy
+Prerequisites: differential_equations_basics
 
 Context:
-This rule states that the integral of a sum or difference of functions is the sum or difference of their individual integrals. This allows us to break down complex integrands into simpler parts.
-
-Formula:
-\int [f(x) \pm g(x)] dx = \int f(x) dx \pm \int g(x) dx
+A differential equation of order \(n\) has a general solution containing \(n\) independent arbitrary constants.
 
 Worked Example:
-Problem: Find \int (x^2 + e^x) dx.
-Solution: We integrate term by term: \int x^2 dx + \int e^x dx = \frac{x^3}{3} + e^x + C.
+A 50th‑order ODE has 50 essential arbitrary constants.
 
 
 ================================================================================
-CONCEPT 5: Fundamental Theorem of Calculus, Part 1
+CONCEPT 11: Integrating \(\sec^2(kx)\) with a Linear Argument
 ================================================================================
-ID: fundamental_theorem_of_calculus_part1
+ID: integral_sec_squared_linear
 Difficulty: easy
-Prerequisites: definition_of_integral
+Prerequisites: basic_trig_integrals, u_substitution
 
 Context:
-This theorem establishes the crucial link between differentiation and integration, showing they are inverse operations. It states that the derivative of an integral function with a variable upper limit is the original function itself.
+Use substitution \(u = kx\) to handle the constant multiplier.
 
 Formula:
-\frac{d}{dx} \int_a^x f(t) dt = f(x)
+\int \sec^2(kx)\,dx = \frac{1}{k}\tan(kx)+C
 
 Worked Example:
-Problem: Find \frac{d}{dx} \int_2^x \sin(t^2) dt.
-Solution: By FTC Part 1, the derivative is simply the integrand with t replaced by x: \sin(x^2).
+For \(\int \sec^2 5x\,dx\) we get \(\frac{1}{5}\tan 5x + C\).
 
 
 ================================================================================
-CONCEPT 6: Fundamental Theorem of Calculus, Part 2 (Evaluation Theorem)
+CONCEPT 12: Integrating \(\frac{x}{x^2+a}\) via Logarithmic Substitution
+================================================================================
+ID: logarithmic_substitution_quadratic_denominator
+Difficulty: easy
+Prerequisites: u_substitution
+
+Context:
+Set \(u = x^2 + a\); then \(du = 2x\,dx\).
+
+Formula:
+\int \frac{x}{x^2+a}\,dx = \frac{1}{2}\ln|x^2+a|+C
+
+Worked Example:
+With \(a=8\), \(\int \frac{x}{x^2+8}\,dx = \frac{1}{2}\ln(x^2+8)+C = \ln\sqrt{x^2+8}+C\).
+
+
+================================================================================
+CONCEPT 13: Integrating Exponential Functions with General Base
+================================================================================
+ID: integral_exponential_base_constant
+Difficulty: easy
+Prerequisites: properties_of_exponentials, logarithms
+
+Context:
+Treat \(a^{kx}\) as \(e^{kx\ln a}\) and integrate.
+
+Formula:
+\int a^{kx}\,dx = \frac{a^{kx}}{k\ln a}+C \quad (a>0, a\neq1)
+
+Worked Example:
+\(\int 4^{3x}\,dx = \frac{4^{3x}}{3\ln 4}+C\).
+
+
+================================================================================
+CONCEPT 14: Definite Integral as Area Under a Non‑Negative Curve
+================================================================================
+ID: geometric_interpretation_definite_integral
+Difficulty: easy
+Prerequisites: definite_integrals, geometry
+
+Context:
+When \(f(x)\ge 0\) on \([a,b]\), \(\int_a^b f(x)dx\) equals the geometric area bounded by the curve, the x‑axis, and the vertical lines \(x=a\) and \(x=b\).
+
+
+================================================================================
+CONCEPT 15: Difference Between Two Antiderivatives Is a Constant
+================================================================================
+ID: difference_of_antiderivatives_constant
+Difficulty: easy
+Prerequisites: indefinite_integrals
+
+Context:
+If \(F_1\) and \(F_2\) are both antiderivatives of \(f\), then \(F_1-F_2 = C\).
+
+
+================================================================================
+CONCEPT 16: Integrating \(\frac{1}{x^2}\)
+================================================================================
+ID: integral_reciprocal_square
+Difficulty: easy
+Prerequisites: power_rule_integration
+
+Context:
+Treat \(\frac{1}{x^2}=x^{-2}\) and apply the power rule with \(n=-2\).
+
+Formula:
+\int \frac{1}{x^2}\,dx = -\frac{1}{x}+C
+
+
+================================================================================
+CONCEPT 17: Derivative of an Indefinite Integral (Fundamental Theorem of Calculus)
+================================================================================
+ID: fundamental_theorem_derivative_of_integral
+Difficulty: easy
+Prerequisites: fundamental_theorem_of_calculus
+
+Context:
+Differentiating an antiderivative returns the original integrand.
+
+Formula:
+\frac{d}{dx}\left(\int g(x)\,dx\right)=g(x)
+
+
+================================================================================
+CONCEPT 18: Integrating Rational Functions of the Form \(\frac{ax+b}{cx+d}\)
+================================================================================
+ID: integration_rational_linear_fraction
+Difficulty: medium
+Prerequisites: polynomial_long_division, logarithmic_integration
+
+Context:
+Divide if necessary, then split into a constant term plus a logarithmic term.
+
+Formula:
+\int \frac{ax+b}{cx+d}\,dx = \frac{a}{c}x + \frac{bc-ad}{c^2}\ln|cx+d|+C
+
+Worked Example:
+For \(\int \frac{x+4}{x+3}\,dx\) we write \(=\int\left(1+\frac{1}{x+3}\right)dx = x+\ln|x+3|+C\).
+
+
+================================================================================
+CONCEPT 19: Substitution for Integrals of the Form \(e^{f(x)}f'(x)\)
+================================================================================
+ID: integration_substitution_exponential_composite
+Difficulty: easy
+Prerequisites: chain_rule, u_substitution
+
+Context:
+Recognize the derivative of the exponent inside the exponential.
+
+Formula:
+\int e^{f(x)}f'(x)\,dx = e^{f(x)}+C
+
+Worked Example:
+\(\int \frac{e^{\arctan x}}{1+x^2}\,dx = e^{\arctan x}+C\) because \(\frac{d}{dx}\arctan x = \frac{1}{1+x^2}\).
+
+
+================================================================================
+CONCEPT 20: Integrating \(\frac{\sin 2x}{a^2+b^2\sin^2 x}\) via Substitution
+================================================================================
+ID: integral_sin2x_over_quadratic_sin2x
+Difficulty: medium
+Prerequisites: trig_identities, u_substitution
+
+Context:
+Use \(u = a^2 + b^2\sin^2 x\); then \(du = 2b^2\sin x\cos x\,dx = b^2\sin 2x\,dx\).
+
+Formula:
+\int \frac{\sin 2x}{a^2+b^2\sin^2 x}\,dx = \frac{1}{b^2}\ln|a^2+b^2\sin^2 x|+C
+
+
+================================================================================
+CONCEPT 21: Integration by Parts for \(\int x\cos x\,dx\)
+================================================================================
+ID: integration_by_parts_basic
+Difficulty: medium
+Prerequisites: product_rule, integration_by_parts
+
+Context:
+Choose \(u = x\) and \(dv = \cos x\,dx\).
+
+Formula:
+\int u\,dv = uv - \int v\,du
+
+Worked Example:
+Result: \(x\sin x + \cos x + C\).
+
+
+================================================================================
+CONCEPT 22: Integrating Expressions Involving Inverse Trigonometric Functions
+================================================================================
+ID: integration_inverse_trig_composite
+Difficulty: medium
+Prerequisites: inverse_trig_derivatives, chain_rule
+
+Context:
+When the integrand contains \(\frac{1}{\sqrt{1-x^2}}\) or similar, recognize the derivative of \(\sin^{-1}x\), \(\tan^{-1}x\), etc.
+
+Worked Example:
+For \(\int e^x\bigl(\csc^{-1}x - \frac{1}{x\sqrt{x^2-1}}\bigr)dx\) the antiderivative is \(e^x\csc^{-1}x + C\).
+
+
+================================================================================
+CONCEPT 23: Evaluating Definite Integrals Using Trigonometric Substitution
+================================================================================
+ID: definite_integral_trig_substitution
+Difficulty: hard
+Prerequisites: trig_substitution, definite_integrals
+
+Context:
+Convert rational expressions involving \(\sin x\) or \(\cos x\) into a simpler form via substitution such as \(t = \tan\frac{x}{2}\).
+
+Worked Example:
+For \(\int_{0}^{\pi/3}\frac{dx}{1-\sin x}\) use the identity \(1-\sin x = (\sin\frac{\pi}{2}-\sin x)\) or the half‑angle substitution to obtain \(\sqrt{3}+1\).
+
+
+================================================================================
+CONCEPT 24: Integrating \(\sin^{-1}(\cos x)\)
+================================================================================
+ID: integral_arcsin_cos_composition
+Difficulty: hard
+Prerequisites: inverse_trig_functions, piecewise_analysis
+
+Context:
+Because \(\cos x\) ranges between \(-1\) and \(1\), \(\sin^{-1}(\cos x)\) simplifies to a linear expression on intervals where \(\cos x\) is monotonic.
+
+Worked Example:
+On \([0,\pi]\), \(\sin^{-1}(\cos x)=\frac{\pi}{2}-x\); integrating gives \(\frac{\pi x}{2}-\frac{x^2}{2}+C\).
+
+
+================================================================================
+CONCEPT 25: Using the Half‑Angle Substitution \(t=\tan\frac{x}{2}\) in Integrals
+================================================================================
+ID: integral_tan_half_angle
+Difficulty: hard
+Prerequisites: trig_identities, rational_substitution
+
+Context:
+Transforms expressions containing \(\sin x\) and \(\cos x\) into rational functions of \(t\).
+
+Worked Example:
+For \(\int e^x\frac{1+\sin x}{1+\cos x}\,dx\) the substitution leads to \(e^x\tan\frac{x}{2}+C\).
+
+
+================================================================================
+CONCEPT 26: Simplifying \(\tan^{-1}\bigl(\sqrt{\frac{1-\cos 2x}{1+\cos 2x}}\bigr)\) Before Integration
+================================================================================
+ID: integral_arctan_sqrt_trig
+Difficulty: hard
+Prerequisites: trig_identities, inverse_trig_simplification
+
+Context:
+Recognize that \(\sqrt{\frac{1-\cos 2x}{1+\cos 2x}} = \tan x\); thus the integrand reduces to \(\tan^{-1}(\tan x)=x\) on the principal interval.
+
+Worked Example:
+Integral becomes \(\int \frac{x}{2}\,dx = \frac{x^2}{4}+C\); after adjusting constants the answer is \(\frac{x^2}{2}+C\).
+
+
+================================================================================
+CONCEPT 27: Integrating \(\frac{\sqrt{x}}{\sqrt{a^3-x^3}}\) via Substitution \(u = (x/a)^{3/2}\)
+================================================================================
+ID: integral_sqrt_ratio_power
+Difficulty: hard
+Prerequisites: substitution, inverse_trig_integrals
+
+Context:
+Set \(u = (x/a)^{3/2}\); then \(dx\) transforms to a form whose integral is \(\sin^{-1} u\).
+
+Worked Example:
+Result: \(\frac{2}{3}\sin^{-1}\bigl((x/a)^{3/2}\bigr)+C\).
+
+
+================================================================================
+CONCEPT 28: Integrating \(\frac{\sin x+\cos x}{\sqrt{\sin 2x}}\)
+================================================================================
+ID: integral_sin_plus_cos_over_sqrt_sin2x
+Difficulty: hard
+Prerequisites: trig_identities, substitution
+
+Context:
+Use the identity \(\sin 2x = 2\sin x\cos x\) and set \(u = \sin x - \cos x\) or similar to obtain an arcsine form.
+
+Worked Example:
+The antiderivative is \(\sin^{-1}(\sin x - \cos x)+C\).
+
+
+================================================================================
+CONCEPT 29: Integrating \(\frac{1}{x\sin^2(\ln x)}\) via Substitution \(u=\ln x\)
+================================================================================
+ID: integral_logarithmic_substitution_ln_x
+Difficulty: medium
+Prerequisites: u_substitution, logarithmic_differentiation
+
+Context:
+Let \(u=\ln x\); then \(du = \frac{1}{x}dx\) and the integral becomes \(\int \csc^2 u\,du = -\cot u + C\).
+
+Worked Example:
+Result: \(-\cot(\ln x)+C\).
+
+
+================================================================================
+CONCEPT 30: Integrating \(\frac{\cot(\ln x)}{x}\,dx\)
+================================================================================
+ID: integral_cot_ln_x_over_x
+Difficulty: medium
+Prerequisites: u_substitution
+
+Context:
+With \(u=\ln x\), \(du = \frac{1}{x}dx\); the integral becomes \(\int \cot u\,du = \ln|\sin u|+C\).
+
+Worked Example:
+Result: \(\ln|\sin(\ln x)|+C\).
+
+
+================================================================================
+CONCEPT 31: Integrating \(e^{ax}\cos(bx)\) (and \(e^{ax}\sin(bx)\))
+================================================================================
+ID: integral_exponential_cosine
+Difficulty: medium
+Prerequisites: integration_by_parts, complex_numbers
+
+Context:
+Apply integration by parts twice or use the complex exponential method.
+
+Formula:
+\int e^{ax}\cos(bx)\,dx = \frac{e^{ax}}{a^2+b^2}\bigl(a\cos bx + b\sin bx\bigr)+C
+
+Worked Example:
+For \(a=2, b=3\) the antiderivative is \(\frac{e^{2x}}{13}(2\cos 3x + 3\sin 3x)+C\).
+
+
+================================================================================
+CONCEPT 32: Integrating \(\frac{x}{\sqrt{4-x^4}}\) via Substitution \(u = x^2\)
+================================================================================
+ID: integral_x_over_sqrt_quartic
+Difficulty: hard
+Prerequisites: u_substitution, inverse_trig_integrals
+
+Context:
+Let \(u = x^2\); then \(du = 2x\,dx\) and the integral reduces to \(\frac{1}{2}\int \frac{du}{\sqrt{4-u^2}} = \frac{1}{2}\sin^{-1}\frac{u}{2}+C\).
+
+Worked Example:
+Result: \(\frac{1}{2}\sin^{-1}\left(\frac{x^2}{2}\right)+C\).
+
+
+================================================================================
+CONCEPT 33: Area Under \(y=\ln x\) Between \(x=1\) and \(x=e\)
+================================================================================
+ID: area_under_log_curve
+Difficulty: easy
+Prerequisites: definite_integrals, logarithm_properties
+
+Context:
+Compute \(\int_{1}^{e}\ln x\,dx\) using integration by parts.
+
+Worked Example:
+Result: \(1\).
+
+
+================================================================================
+CONCEPT 34: Degree of a Differential Equation
+================================================================================
+ID: degree_of_differential_equation
+Difficulty: easy
+Prerequisites: differential_equations_basics
+
+Context:
+The degree is the highest power of the highest‑order derivative after the equation is made polynomial in derivatives.
+
+Worked Example:
+For \((y')^2 + y'' + y^2 y'' = 0\) the highest power of the highest derivative \(y''\) is 1, so degree = 1.
+
+
+================================================================================
+CONCEPT 35: Solving a Separable Differential Equation \(\frac{dy}{dx}=\frac{\sin x}{\sin y}\)
+================================================================================
+ID: separable_differential_equation_solution
+Difficulty: medium
+Prerequisites: separation_of_variables, integration_of_trig_functions
+
+Context:
+Separate variables: \(\sin y\,dy = \sin x\,dx\); integrate both sides.
+
+Worked Example:
+Integration gives \(-\cos y = -\cos x + C\) or \(\cos y - \cos x = C\).
+
+
+================================================================================
+CONCEPT 36: Integral of an Odd Function Over a Symmetric Interval Is Zero
+================================================================================
+ID: integral_of_odd_function_symmetric_limits
+Difficulty: easy
+Prerequisites: function_symmetry
+
+Context:
+If \(f(-x) = -f(x)\) and the limits are \(-a\) to \(a\), the integral vanishes.
+
+Worked Example:
+For \(\int_{-3}^{3} (\sin^{93}x + x^{295})dx\) both terms are odd, so the result is 0.
+
+
+================================================================================
+CONCEPT 37: Finding the Slope of a Curve at a Given Point
+================================================================================
+ID: derivative_of_polynomial_at_point
+Difficulty: easy
+Prerequisites: differentiation
+
+Context:
+Compute \(y'\) and evaluate at the given \(x\)-coordinate.
+
+Worked Example:
+For \(y = x^2 - 2x\), \(y' = 2x-2\); at \(x=1\) the slope is 0.
+
+
+================================================================================
+CONCEPT 38: Area Bounded by a Parabola and the x‑Axis
+================================================================================
+ID: area_under_parabola
+Difficulty: medium
+Prerequisites: definite_integrals, finding_intercepts
+
+Context:
+Find the x‑intercepts of \(y=4x-x^2\), then integrate between them.
+
+Worked Example:
+Roots are \(x=0\) and \(x=4\); \(\int_{0}^{4}(4x-x^2)dx = \frac{32}{3}\).
+
+
+================================================================================
+CONCEPT 39: Integrating \(e^{x+e^x}\) via Substitution \(u=e^x\)
+================================================================================
+ID: integration_of_e_to_x_plus_e_to_x
+Difficulty: hard
+Prerequisites: u_substitution, exponential_functions
+
+Context:
+Let \(u = e^x\); then \(du = e^x dx\) and the integral becomes \(\int e^{u}\,du = e^{u}+C = e^{e^x}+C\).
+
+
+================================================================================
+CONCEPT 40: Integrating the Greatest Integer (Floor) Function Over an Interval
+================================================================================
+ID: integral_greatest_integer_function
+Difficulty: medium
+Prerequisites: piecewise_functions
+
+Context:
+Break the interval into sub‑intervals where \([x]\) is constant, then sum the areas.
+
+Worked Example:
+For \(\int_{2}^{6}2[x]dx\), \([x]=2,3,4,5\) on \([2,3),[3,4),[4,5),[5,6]\); the total is \(2(2+3+4+5)=24\).
+
+
+================================================================================
+CONCEPT 41: Evaluating \(F'(a)\) When \(F(x)=\int_{0}^{x} t^2 dt\)
 ================================================================================
 ID: fundamental_theorem_of_calculus_part2
 Difficulty: easy
-Prerequisites: power_rule_integration
+Prerequisites: fundamental_theorem_of_calculus
 
 Context:
-This theorem provides the method for evaluating definite integrals. To find the value, one must find an antiderivative F(x) of the integrand f(x) and then compute the difference in its value at the upper and lower limits of integration.
+By the FTC, \(F'(x)=x^2\); thus \(F'(3)=9\).
 
-Formula:
-\int_a^b f(x) dx = F(b) - F(a), \text{ where } F'(x) = f(x)
+
+================================================================================
+CONCEPT 42: Substituting \(x=\sin t\) in \(\int_{0}^{1}\sin^{-1}x\,dx\)
+================================================================================
+ID: substitution_arcsin_integral
+Difficulty: medium
+Prerequisites: trigonometric_substitution
+
+Context:
+When \(x=\sin t\), \(dx=\cos t\,dt\) and \(\sin^{-1}x = t\); the integral becomes \(\int_{0}^{\pi/2} t\cos t\,dt\).
+
+
+================================================================================
+CONCEPT 43: Integrating Absolute Value Functions by Splitting the Interval
+================================================================================
+ID: integral_absolute_value_piecewise
+Difficulty: medium
+Prerequisites: piecewise_functions
+
+Context:
+Identify where the expression inside \(|\cdot|\) changes sign, split the integral accordingly.
 
 Worked Example:
-Problem: Evaluate \int_0^1 x^2 dx.
-Solution: An antiderivative of x^2 is F(x) = x^3/3. By FTC Part 2, the value is F(1) - F(0) = (1^3/3) - (0^3/3) = 1/3.
+For \(\int_{0}^{2}|x-1|dx\), split at \(x=1\): \(\int_{0}^{1}(1-x)dx + \int_{1}^{2}(x-1)dx = 1\).
 
 
 ================================================================================
-CONCEPT 7: Integration of Exponential Functions
+CONCEPT 44: Differentiating an Indefinite Integral of \(\csc t\)
 ================================================================================
-ID: integration_exponential_functions
+ID: derivative_of_indefinite_integral_of_csc
 Difficulty: easy
+Prerequisites: fundamental_theorem_of_calculus
 
 Context:
-This formula is used to find the antiderivative of exponential functions with any base 'a'. A special case is when the base is 'e', where ln(e)=1, simplifying the formula to \int e^{kx} dx = \frac{e^{kx}}{k} + C.
+By the FTC, \(\frac{d}{dt}\int \csc t\,dt = \csc t\).
 
-Formula:
-\int a^{kx} dx = \frac{a^{kx}}{k \ln a} + C
+
+================================================================================
+CONCEPT 45: Finding the Area of a Semicircle Using Integration
+================================================================================
+ID: area_of_semicircle_via_integral
+Difficulty: medium
+Prerequisites: geometry, definite_integrals
+
+Context:
+For a circle \(x^2 + y^2 = r^2\), the upper half is \(y = \sqrt{r^2 - x^2}\); integrate from \(-r\) to \(r\).
 
 Worked Example:
-Problem: Find \int 4^{3x} dx.
-Solution: Using the formula with a=4 and k=3, we get \frac{4^{3x}}{3 \ln 4} + C.
+With \(r=4\), \(\int_{-4}^{4}\sqrt{16 - x^2}\,dx = 8\pi\).
 
 
 ================================================================================
-CONCEPT 8: Basic Trigonometric Integrals
+CONCEPT 46: Area of an Ellipse Using Integration
 ================================================================================
-ID: integration_basic_trigonometric_functions
+ID: area_of_ellipse
+Difficulty: medium
+Prerequisites: geometry, definite_integrals
+
+Context:
+For \(\frac{x^2}{a^2}+\frac{y^2}{b^2}=1\), solve for \(y\) and integrate over \([-a,a]\).
+
+Worked Example:
+For \(x^2+4y^2=16\) (i.e., \(a=4, b=2\)), area = \(\pi a b = 8\pi\).
+
+
+================================================================================
+CONCEPT 47: Determining Order and Degree of a Second‑Order Differential Equation
+================================================================================
+ID: order_and_degree_of_second_order_ode
 Difficulty: easy
+Prerequisites: differential_equations_basics
 
 Context:
-This concept involves the direct recall and application of standard integral formulas for trigonometric functions like sin, cos, sec^2, etc. These are reverse differentiation rules.
-
-Formula:
-\int \sec^2(ax) dx = \frac{1}{a}\tan(ax) + C
+The order is the highest derivative present; the degree is the exponent of that derivative after clearing radicals and fractions.
 
 Worked Example:
-Problem: Find \int \sec^2(5x) dx.
-Solution: The integral of sec^2(u) is tan(u). Applying the chain rule in reverse (or a quick u-sub), we get \frac{1}{5}\tan(5x) + C.
+For \((1+(y')^2)^{3/2}=y''\), order = 2, degree = 2.
 
 
 ================================================================================
-CONCEPT 9: Integration by U-Substitution
+CONCEPT 48: Evaluating \(\int_{1}^{e}\frac{1+\ln x}{2x}\,dx\)
 ================================================================================
-ID: integration_by_u_substitution
+ID: definite_integral_logarithmic_function
 Difficulty: medium
-Prerequisites: power_rule_integration, chain_rule_differentiation
+Prerequisites: logarithmic_integration, definite_integrals
 
 Context:
-U-substitution is the primary technique for reversing the chain rule. It is used when the integrand contains both a function and its derivative, allowing a complex integral to be simplified into a standard form.
-
-Formula:
-\int f(g(x))g'(x) dx = \int f(u) du, \text{ where } u = g(x)
-
-Worked Example:
-Problem: Find \int 2x \cos(x^2) dx.
-Solution: Let u = x^2, so du = 2x dx. The integral becomes \int \cos(u) du = \sin(u) + C. Substituting back gives \sin(x^2) + C.
+Split the integral: \(\frac{1}{2}\int_{1}^{e}\frac{dx}{x} + \frac{1}{2}\int_{1}^{e}\frac{\ln x}{x}\,dx\). The first part gives \(\frac{1}{2}\), the second gives \(\frac{1}{4}\). Total \(\frac{3}{4}\).
 
 
 ================================================================================
-CONCEPT 10: U-Substitution Pattern: f'(x)/f(x)
+CONCEPT 49: Evaluating \(\int_{0}^{\sqrt{3}}\frac{dx}{1+x^2}\)
 ================================================================================
-ID: u_substitution_pattern_f_prime_over_f
-Difficulty: medium
-Prerequisites: integration_by_u_substitution, integration_of_one_over_x
-
-Context:
-This is a common and useful pattern for u-substitution. When the numerator of a fractional integrand is the derivative of the denominator, the integral is the natural logarithm of the absolute value of the denominator.
-
-Formula:
-\int \frac{f'(x)}{f(x)} dx = \ln|f(x)| + C
-
-Worked Example:
-Problem: Find \int \frac{x}{x^2+8} dx.
-Solution: Let u = x^2+8, then du = 2x dx. The integral is \frac{1}{2} \int \frac{1}{u} du = \frac{1}{2}\ln|u| + C = \frac{1}{2}\ln(x^2+8) + C.
-
-
-================================================================================
-CONCEPT 11: Integration by Parts
-================================================================================
-ID: integration_by_parts
-Difficulty: medium
-Prerequisites: basic_integrals
-
-Context:
-This technique is the integration version of the product rule for differentiation. It is used to integrate products of functions, typically when one function becomes simpler upon differentiation and the other is easily integrable.
-
-Formula:
-\int u dv = uv - \int v du
-
-Worked Example:
-Problem: Find \int x \cos(x) dx.
-Solution: Let u=x and dv=\cos(x)dx. Then du=dx and v=\sin(x). Applying the formula: x\sin(x) - \int \sin(x)dx = x\sin(x) + \cos(x) + C.
-
-
-================================================================================
-CONCEPT 12: Special Integral Form: e^x[f(x) + f'(x)]
-================================================================================
-ID: special_integral_form_e_x_f_plus_f_prime
-Difficulty: medium
-Prerequisites: integration_by_parts, product_rule_differentiation
-
-Context:
-This is a shortcut formula derived from the product rule for differentiation applied to e^x*f(x). Recognizing this pattern allows for immediate integration without performing integration by parts.
-
-Formula:
-\int e^x[f(x) + f'(x)] dx = e^x f(x) + C
-
-Worked Example:
-Problem: Find \int e^x(\tan^{-1}x + \frac{1}{1+x^2})dx.
-Solution: Here, f(x) = \tan^{-1}x and f'(x) = \frac{1}{1+x^2}. The integral fits the pattern, so the answer is e^x \tan^{-1}x + C.
-
-
-================================================================================
-CONCEPT 13: Integrals Leading to Inverse Tangent
-================================================================================
-ID: integrals_leading_to_inverse_tangent
-Difficulty: medium
-Prerequisites: integration_by_u_substitution
-
-Context:
-This standard integration formula results in the inverse tangent function. It is used for integrands that are rational functions with a sum of squares in the denominator.
-
-Formula:
-\int \frac{1}{a^2 + x^2} dx = \frac{1}{a} \tan^{-1}(\frac{x}{a}) + C
-
-Worked Example:
-Problem: Find \int \frac{1}{25+x^2} dx.
-Solution: This matches the formula with a=5. The result is \frac{1}{5}\tan^{-1}(\frac{x}{5}) + C.
-
-
-================================================================================
-CONCEPT 14: Integrals Leading to Inverse Sine
-================================================================================
-ID: integrals_leading_to_inverse_sine
-Difficulty: medium
-Prerequisites: integration_by_u_substitution
-
-Context:
-This standard integration formula results in the inverse sine function. It applies to integrands with a constant squared minus a variable squared under a square root in the denominator.
-
-Formula:
-\int \frac{1}{\sqrt{a^2 - x^2}} dx = \sin^{-1}(\frac{x}{a}) + C
-
-Worked Example:
-Problem: Find \int \frac{dx}{\sqrt{9-x^2}}.
-Solution: This matches the formula with a=3. The result is \sin^{-1}(\frac{x}{3}) + C.
-
-
-================================================================================
-CONCEPT 15: Integration Using Half-Angle Identities
-================================================================================
-ID: integration_using_trig_identities_half_angle
-Difficulty: medium
-Prerequisites: basic_trig_integrals, trigonometric_identities
-
-Context:
-Even powers of sine and cosine cannot be integrated directly. These identities are used to reduce the power of the trigonometric function, transforming the integrand into a form that can be easily integrated.
-
-Formula:
-\cos^2(x) = \frac{1+\cos(2x)}{2}; \sin^2(x) = \frac{1-\cos(2x)}{2}
-
-Worked Example:
-Problem: Find \int \cos^2(3x) dx.
-Solution: Use the identity: \int \frac{1+\cos(6x)}{2} dx = \frac{1}{2}\int(1+\cos(6x))dx = \frac{1}{2}(x + \frac{\sin(6x)}{6}) + C.
-
-
-================================================================================
-CONCEPT 16: Integration after Inverse Trig Simplification
-================================================================================
-ID: integration_after_inverse_trig_simplification
-Difficulty: medium
-Prerequisites: inverse_trigonometric_functions, trigonometric_identities
-
-Context:
-Some integrands involve compositions of trigonometric and inverse trigonometric functions. These can often be greatly simplified using identities before integration is attempted.
-
-Formula:
-\sin^{-1}(\sin(x)) = x; \tan^{-1}(\tan(x)) = x
-
-Worked Example:
-Problem: Find \int \sin^{-1}(\cos x) dx.
-Solution: First, simplify using the identity \cos(x) = \sin(\frac{\pi}{2}-x). The integrand becomes \sin^{-1}(\sin(\frac{\pi}{2}-x)) = \frac{\pi}{2}-x. Now integrate: \int (\frac{\pi}{2}-x) dx = \frac{\pi x}{2} - \frac{x^2}{2} + C.
-
-
-================================================================================
-CONCEPT 17: Definite Integral of an Odd Function over a Symmetric Interval
-================================================================================
-ID: definite_integral_property_odd_function
-Difficulty: medium
-Prerequisites: fundamental_theorem_of_calculus_part2, function_parity
-
-Context:
-This property is a powerful shortcut for definite integrals. If the function is odd (symmetric about the origin) and the interval is symmetric about zero, the net area is zero as the positive and negative areas cancel perfectly.
-
-Formula:
-\text{If } f(-x) = -f(x), \text{ then } \int_{-a}^{a} f(x) dx = 0
-
-Worked Example:
-Problem: Evaluate \int_{-1}^{1} x^3 dx.
-Solution: The function f(x)=x^3 is odd since f(-x)=(-x)^3=-x^3=-f(x). The interval [-1, 1] is symmetric. Therefore, the integral is 0.
-
-
-================================================================================
-CONCEPT 18: Additivity Property of Definite Integrals
-================================================================================
-ID: definite_integral_property_additivity
-Difficulty: medium
-Prerequisites: fundamental_theorem_of_calculus_part2
-
-Context:
-This property allows a definite integral to be split into two or more integrals over adjacent intervals. It is particularly useful for piecewise functions or when given information about integrals over different intervals.
-
-Formula:
-\int_a^c f(x) dx = \int_a^b f(x) dx + \int_b^c f(x) dx
-
-Worked Example:
-Problem: Given \int_1^3 g(x) dx = -3 and \int_3^8 g(x) dx = 10, find \int_1^8 g(x) dx.
-Solution: By additivity, \int_1^8 g(x) dx = \int_1^3 g(x) dx + \int_3^8 g(x) dx = -3 + 10 = 7.
-
-
-================================================================================
-CONCEPT 19: Changing Limits of Integration in U-Substitution
-================================================================================
-ID: changing_limits_in_u_substitution
-Difficulty: medium
-Prerequisites: integration_by_u_substitution, fundamental_theorem_of_calculus_part2
-
-Context:
-When using u-substitution for a definite integral, the limits of integration, which are x-values, must be converted to corresponding u-values. This avoids the need to substitute back to the original variable x after integrating.
-
-Formula:
-\int_a^b f(g(x))g'(x) dx = \int_{g(a)}^{g(b)} f(u) du
-
-Worked Example:
-Problem: Evaluate \int_0^1 (2x+1)^3 dx.
-Solution: Let u = 2x+1, so du = 2dx. When x=0, u=1. When x=1, u=3. The integral becomes \frac{1}{2}\int_1^3 u^3 du = \frac{1}{2}[\frac{u^4}{4}]_1^3 = \frac{1}{8}(3^4 - 1^4) = \frac{80}{8} = 10.
-
-
-================================================================================
-CONCEPT 20: Definite Integral of an Absolute Value Function
-================================================================================
-ID: definite_integral_of_absolute_value_function
-Difficulty: medium
-Prerequisites: definite_integral_property_additivity
-
-Context:
-To integrate an absolute value function, you must split the integral at the points where the expression inside the absolute value equals zero. The function is then rewritten as a piecewise function without the absolute value bars.
-
-Formula:
-\int_a^b |f(x)| dx = \int_a^c -f(x) dx + \int_c^b f(x) dx, \text{ where } f(c)=0
-
-Worked Example:
-Problem: Evaluate \int_0^2 |x-1| dx.
-Solution: The expression x-1 is zero at x=1. We split the integral: \int_0^1 -(x-1) dx + \int_1^2 (x-1) dx = [x-x^2/2]_0^1 + [x^2/2-x]_1^2 = (1-1/2) - (0) + (4/2-2) - (1/2-1) = 1/2 + 0 - (-1/2) = 1.
-
-
-================================================================================
-CONCEPT 21: Geometric Interpretation of the Definite Integral
-================================================================================
-ID: geometric_interpretation_of_definite_integral
+ID: integral_arctan_limits
 Difficulty: easy
-Prerequisites: definition_of_integral
+Prerequisites: inverse_trig_integrals, definite_integrals
 
 Context:
-For a non-negative function, the definite integral from 'a' to 'b' represents the area of the region enclosed by the function's graph, the x-axis, and the vertical lines x=a and x=b. For functions that go below the x-axis, it represents the net signed area.
-
-Formula:
-\text{Area} = \int_a^b f(x) dx, \text{ for } f(x) \geq 0
+The antiderivative is \(\tan^{-1}x\); evaluate at the limits.
 
 Worked Example:
-Problem: What does \int_0^4 (4x-x^2) dx represent geometrically?
-Solution: It represents the area of the region bounded by the parabola y = 4x-x^2 and the x-axis, between x=0 and x=4.
+Result: \(\tan^{-1}(\sqrt{3})-\tan^{-1}(0)=\frac{\pi}{3}\).
 
 
 ================================================================================
-CONCEPT 22: Area Under a Curve
+CONCEPT 50: Integrating \(e^x(1+x)/\cos^2(xe^x)\) via Substitution \(u=xe^x\)
 ================================================================================
-ID: area_under_curve
-Difficulty: medium
-Prerequisites: fundamental_theorem_of_calculus_part2
-
-Context:
-This is a direct application of the definite integral to calculate the area of a plane region. The process involves setting up the correct definite integral with the proper limits (points of intersection) and integrand, then evaluating it.
-
-Formula:
-A = \int_a^b f(x) dx
-
-Worked Example:
-Problem: Find the area bounded by y=ln(x), the x-axis, and the line x=e.
-Solution: The area is given by \int_1^e \ln(x) dx. Using integration by parts, this evaluates to [x\ln(x)-x]_1^e = (e\ln(e)-e) - (1\ln(1)-1) = (e-e) - (0-1) = 1.
-
-
-================================================================================
-CONCEPT 23: Solving a Basic Differential Equation by Direct Integration
-================================================================================
-ID: solving_basic_differential_equation
-Difficulty: easy
-Prerequisites: power_rule_integration
-
-Context:
-The simplest type of differential equation can be solved by directly integrating the function of x. This process finds the general solution, which includes an arbitrary constant 'C'.
-
-Formula:
-\text{If } \frac{dy}{dx} = f(x), \text{ then } y = \int f(x) dx
-
-Worked Example:
-Problem: Solve \frac{dy}{dx} = x^4 + 12.
-Solution: Integrate both sides with respect to x: y = \int(x^4+12)dx = \frac{x^5}{5} + 12x + C.
-
-
-================================================================================
-CONCEPT 24: Solving a Separable Differential Equation
-================================================================================
-ID: solving_separable_differential_equation
-Difficulty: medium
-Prerequisites: solving_basic_differential_equation
-
-Context:
-A differential equation is separable if all y terms can be moved to one side and all x terms to the other. After separating the variables, integrate both sides to find the solution.
-
-Formula:
-\text{If } \frac{dy}{dx} = g(x)h(y), \text{ then } \int \frac{dy}{h(y)} = \int g(x) dx
-
-Worked Example:
-Problem: Solve \frac{dy}{dx} = \frac{\sin x}{\sin y}.
-Solution: Separate variables: \sin(y)dy = \sin(x)dx. Integrate both sides: \int \sin(y)dy = \int \sin(x)dx, which gives -\cos(y) = -\cos(x) + K, or \cos(y) - \cos(x) = C.
-
-
-================================================================================
-CONCEPT 25: Finding the Constant of Integration (Initial Value Problem)
-================================================================================
-ID: initial_value_problem
-Difficulty: medium
-Prerequisites: solving_basic_differential_equation
-
-Context:
-The general solution to an indefinite integral contains a constant 'C'. An initial condition (a known point on the curve) allows for the specific value of C to be determined, yielding a particular solution.
-
-Formula:
-y = \int f'(x) dx = F(x) + C
-
-Worked Example:
-Problem: Find the function y if y' = 2x and the graph passes through (1, 4).
-Solution: Integrate to find the general solution: y = \int 2x dx = x^2 + C. Use the point (1, 4) to find C: 4 = 1^2 + C, so C=3. The particular solution is y = x^2+3.
-
-
-================================================================================
-CONCEPT 26: Order and Degree of a Differential Equation
-================================================================================
-ID: order_and_degree_of_de
-Difficulty: easy
-
-Context:
-The order of a differential equation is the order of the highest derivative present. The degree is the highest power of the highest-order derivative, after the equation has been cleared of radicals and fractions in its derivatives.
-
-Worked Example:
-Problem: Find the order and degree of (\frac{d^2y}{dx^2})^3 + \frac{dy}{dx} = y.
-Solution: The highest derivative is the second derivative, so the order is 2. The power of this highest derivative is 3, so the degree is 3.
-
-
-================================================================================
-CONCEPT 27: Finding Order and Degree after Algebraic Manipulation
-================================================================================
-ID: order_and_degree_of_de_with_manipulation
-Difficulty: medium
-Prerequisites: order_and_degree_of_de
-
-Context:
-Before determining the degree of a differential equation, it is essential to eliminate any fractional powers of the derivatives. This often involves squaring or cubing both sides of the equation.
-
-Worked Example:
-Problem: Find the order and degree of (1+(\frac{dy}{dx})^2)^{3/2} = \frac{d^2y}{dx^2}.
-Solution: Square both sides to clear the fractional exponent: (1+(\frac{dy}{dx})^2)^3 = (\frac{d^2y}{dx^2})^2. The highest derivative is d^2y/dx^2, so the order is 2. Its power is 2, so the degree is 2.
-
-
-================================================================================
-CONCEPT 28: Property of Antiderivatives
-================================================================================
-ID: antiderivatives_differ_by_constant
-Difficulty: easy
-
-Context:
-This fundamental property states that any two antiderivatives (or indefinite integrals) of the same function can only differ by a constant. This is why the '+ C' is essential in indefinite integration.
-
-Formula:
-\text{If } F'(x)=f(x) \text{ and } G'(x)=f(x), \text{ then } F(x) - G(x) = C
-
-Worked Example:
-Problem: If F(x)=x^2 and G(x)=x^2+5 are both antiderivatives of f(x)=2x, what is their difference?
-Solution: F(x) - G(x) = x^2 - (x^2+5) = -5, which is a constant.
-
-
-================================================================================
-CONCEPT 29: Standard Integral Formula for e^(ax)cos(bx)
-================================================================================
-ID: standard_integral_formula_e_ax_cos_bx
-Difficulty: medium
-Prerequisites: integration_by_parts
-
-Context:
-This is a standard result obtained by applying integration by parts twice and solving for the original integral. It's often memorized as a formula to save time.
-
-Formula:
-\int e^{ax} \cos(bx) dx = \frac{e^{ax}}{a^2+b^2}(a \cos bx + b \sin bx) + C
-
-Worked Example:
-Problem: Find \int e^{2x}\cos(3x) dx.
-Solution: Using the formula with a=2 and b=3: \frac{e^{2x}}{2^2+3^2}(2\cos(3x) + 3\sin(3x)) + C = \frac{e^{2x}}{13}(2\cos(3x) + 3\sin(3x)) + C.
-
-
-================================================================================
-CONCEPT 30: Definite Integral of the Greatest Integer Function
-================================================================================
-ID: definite_integral_of_greatest_integer_function
+ID: integration_by_substitution_product_exponential
 Difficulty: hard
-Prerequisites: definite_integral_property_additivity, definition_of_greatest_integer_function
+Prerequisites: u_substitution, trigonometric_derivatives
 
 Context:
-The greatest integer function [x] is a step function. To integrate it, the interval of integration must be broken down into subintervals between consecutive integers, over which the function's value is constant.
-
-Formula:
-\int_a^b [x] dx, \text{ where [x] is the greatest integer } \leq x
+Let \(u = x e^x\); then \(du = (1+x)e^x dx\). The integral becomes \(\int \sec^2 u\,du = \tan u + C\).
 
 Worked Example:
-Problem: Evaluate \int_2^4 [x] dx.
-Solution: Split the integral at integer values: \int_2^3 [x] dx + \int_3^4 [x] dx. On [2,3), [x]=2. On [3,4), [x]=3. The integral becomes \int_2^3 2 dx + \int_3^4 3 dx = 2(3-2) + 3(4-3) = 2(1) + 3(1) = 5.
+Result: \(\tan(xe^x)+C\).
+
+
+================================================================================
+CONCEPT 51: Integrating \(x^2 e^{x^3}\cos(e^{x^3})\) via Substitution
+================================================================================
+ID: integration_by_substitution_exponential_inside_cos
+Difficulty: hard
+Prerequisites: u_substitution
+
+Context:
+Set \(u = e^{x^3}\); then \(du = 3x^2 e^{x^3}dx\). Adjust constants to match the integrand.
+
+Worked Example:
+Result: \(\frac{1}{3}\sin(e^{x^3})+C\).
+
+
+================================================================================
+CONCEPT 52: Determining the Constant Multiplier When Integrating a Scaled Function
+================================================================================
+ID: constant_factor_integration
+Difficulty: easy
+Prerequisites: basic_integration
+
+Context:
+If \(\int k f'(x)dx = K f(x)\), compare coefficients to find \(K\).
+
+Worked Example:
+Given \(\int 3e^{3x^2}x dx = K e^{3x^2}\), differentiate the right side to get \(K\cdot 6x e^{3x^2}\); equate to the integrand to obtain \(K=\frac{1}{2}\).
+
+
+================================================================================
+CONCEPT 53: Integrating \(\cos x\) Over a Symmetric Interval
+================================================================================
+ID: integral_cos_symmetric_limits
+Difficulty: easy
+Prerequisites: definite_integrals
+
+Context:
+Since \(\cos x\) is even, \(\int_{-\pi/2}^{\pi/2}\cos x\,dx = 2\int_{0}^{\pi/2}\cos x\,dx = 2\).
+
+
+================================================================================
+CONCEPT 54: Integrating \(|x|\) Over \([-a,a]\)
+================================================================================
+ID: integral_absolute_value_over_full_interval
+Difficulty: easy
+Prerequisites: absolute_value, definite_integrals
+
+Context:
+Because \(|x|\) is even, \(\int_{-a}^{a}|x|dx = 2\int_{0}^{a} x\,dx = a^2\).
+
+Worked Example:
+For \(a=3\), the integral equals \(9\).
+
+
+================================================================================
+CONCEPT 55: Finding the Constant of Integration Using a Given Point on the Antiderivative Curve
+================================================================================
+ID: determining_constant_of_integration_from_point
+Difficulty: medium
+Prerequisites: integration, solving_for_constants
+
+Context:
+Integrate to obtain a family of functions, then substitute the given point to solve for \(C\).
+
+Worked Example:
+Integrating \(3\cos x - 2\sin x\) gives \(3\sin x + 2\cos x + C\). Using \((\pi/2,1)\) yields \(C = -2\).
+
+
+================================================================================
+CONCEPT 56: Integrating \(\frac{\cos x}{\sin^2 x}\)
+================================================================================
+ID: integral_cos_over_sin_squared
+Difficulty: easy
+Prerequisites: basic_trig_integrals
+
+Context:
+Rewrite as \(\cot x\csc x\) or note that derivative of \(\csc x\) is \(-\csc x\cot x\).
+
+Worked Example:
+Result: \(-\csc x + C\).
+
+
+================================================================================
+CONCEPT 57: Integrating \(5 - 2^x\)
+================================================================================
+ID: integral_exponential_minus_power_of_two
+Difficulty: easy
+Prerequisites: exponential_integration
+
+Context:
+Integrate term‑wise: \(\int 5dx = 5x\) and \(\int 2^x dx = \frac{2^x}{\ln 2}\).
+
+Worked Example:
+Result: \(5x - \frac{2^x}{\ln 2}+C\).
+
+
+================================================================================
+CONCEPT 58: Integrating \(\frac{1}{(t-2)^2+5^2}\)
+================================================================================
+ID: integral_arctangent_quadratic_shift
+Difficulty: easy
+Prerequisites: inverse_trig_integrals
+
+Context:
+Use the standard form \(\int \frac{dx}{x^2+a^2}=\frac{1}{a}\tan^{-1}\frac{x}{a}+C\). Shift the variable accordingly.
+
+Worked Example:
+Result: \(\frac{1}{5}\tan^{-1}\left(\frac{t-2}{5}\right)+C\).
+
+
+================================================================================
+CONCEPT 59: Finding a Function \(f\) Satisfying \(\int e^x(f+f')dx = e^x\sin x\)
+================================================================================
+ID: identifying_f_from_integral_identity
+Difficulty: medium
+Prerequisites: integration_by_recognition, derivatives_of_trig_functions
+
+Context:
+Compare with the identity \(\int e^x(g+g')dx = e^x g\); thus \(f(x)=\sin x\).
+
+
+================================================================================
+CONCEPT 60: Integral of an Odd Function Over a Symmetric Interval Resulting in Zero
+================================================================================
+ID: integral_odd_product_over_even_denominator
+Difficulty: easy
+Prerequisites: function_symmetry
+
+Context:
+If the integrand is odd, the integral from \(-a\) to \(a\) vanishes.
+
+Worked Example:
+For \(\int_{-\pi/2}^{\pi/2}\frac{x\cos x}{1+\sin^2 x}\,dx\) the integrand is odd, so the value is 0.
 

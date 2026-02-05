@@ -104,7 +104,8 @@ async def health_check():
 @app.post("/generate-mcqs", response_model=GenerateMCQResponse, tags=["Generation"])
 async def generate_mcqs(
     file: UploadFile = File(..., description="Input file (chapter.md or existing MCQs)"),
-    subject: str = Form(..., description="Subject name (e.g., 'Calculus - Integration', 'Linear Algebra')"),
+    subject: str = Form(..., description="Subject name (e.g., 'Calculus', 'Linear Algebra')"),
+    chapter: str = Form(..., description="Chapter name (e.g., 'Chapter 3 - Definite Integrals')"),
     input_type: str = Form("chapter", description="Type of input: 'chapter' or 'mcqs'"),
     include_explanations: bool = Form(True, description="Include explanations in MCQs")
 ):
@@ -115,7 +116,7 @@ async def generate_mcqs(
     and generates new MCQs using the LLM configuration from environment variables.
     
     The generation is synchronous - the endpoint returns after completion.
-    All results are stored in MongoDB Atlas organized by subject.
+    All results are stored in MongoDB Atlas organized by subject and chapter.
     
     Configuration is read from .env file:
     - DEFAULT_LLM_PROVIDER (gemini/openai/anthropic)
@@ -155,6 +156,7 @@ async def generate_mcqs(
         # Create session record in database
         storage.save_session(
             subject=subject,
+            chapter=chapter,
             input_filename=file.filename,
             input_type=input_type,
             llm_provider=llm_provider,
@@ -167,6 +169,7 @@ async def generate_mcqs(
         print(f"API REQUEST - Session ID: {session_id}")
         print(f"{'='*60}")
         print(f"Subject: {subject}")
+        print(f"Chapter: {chapter}")
         print(f"File: {file.filename}")
         print(f"Input Type: {input_type}")
         print(f"LLM: {llm_provider} - {model}")
@@ -225,12 +228,12 @@ async def generate_mcqs(
         analyzer_result = content_analyzer_node(temp_state)
         concepts = analyzer_result.get("current_batch", []) + analyzer_result.get("concepts_queue", [])
         
-        # Save concepts to database
+        # Save concepts to database, chapter=chapter
         if concepts:
-            storage.save_concepts(concepts, subject=subject)
+            storage.save_concepts(concepts, subject=subject, chapter=chapter)
         
         # Save MCQs to database
-        storage.save_mcqs(mcqs, subject=subject)
+        storage.save_mcqs(mcqs, subject=subject, chapter=chapter)
         
         # Calculate metrics
         difficulty_dist = {}
@@ -281,6 +284,7 @@ async def generate_mcqs(
                 id=str(saved_mcq["_id"]),
                 session_id=saved_mcq["session_id"],
                 subject=saved_mcq["subject"],
+                chapter=saved_mcq["chapter"],
                 question_number=saved_mcq["question_number"],
                 concept_id=saved_mcq["concept_id"],
                 stem=saved_mcq["stem"],
@@ -332,13 +336,14 @@ async def generate_mcqs(
 @app.get("/sessions", response_model=SessionListResponse, tags=["Sessions"])
 async def list_sessions(
     subject: Optional[str] = Query(None, description="Filter by subject"),
+    chapter: Optional[str] = Query(None, description="Filter by chapter"),
     skip: int = Query(0, ge=0, description="Number of sessions to skip"),
     limit: int = Query(10, ge=1, le=100, description="Maximum sessions to return")
 ):
     """
     List all MCQ generation sessions.
     
-    Optionally filter by subject. Returns paginated list of sessions with metadata.
+    Optionally filter by subject and/or chapter. Returns paginated list of sessions with metadata.
     """
     db = await get_async_database()
     
@@ -346,6 +351,8 @@ async def list_sessions(
     query_filter = {}
     if subject:
         query_filter["subject"] = subject
+    if chapter:
+        query_filter["chapter"] = chapter
     
     # Get total count
     total = await db[COLLECTIONS["mcq_sessions"]].count_documents(query_filter)
@@ -363,6 +370,7 @@ async def list_sessions(
             id=str(session["_id"]),
             session_id=session["session_id"],
             subject=session["subject"],
+            chapter=session["chapter"],
             input_filename=session["input_filename"],
             input_type=session["input_type"],
             llm_provider=session["llm_provider"],
@@ -397,6 +405,7 @@ async def get_session(session_id: str):
         id=str(session["_id"]),
         session_id=session["session_id"],
         subject=session["subject"],
+        chapter=session["chapter"],
         input_filename=session["input_filename"],
         input_type=session["input_type"],
         llm_provider=session["llm_provider"],
@@ -413,6 +422,7 @@ async def get_session(session_id: str):
 @app.get("/mcqs", response_model=MCQListResponse, tags=["MCQs"])
 async def list_mcqs(
     subject: Optional[str] = Query(None, description="Filter by subject"),
+    chapter: Optional[str] = Query(None, description="Filter by chapter"),
     session_id: Optional[str] = Query(None, description="Filter by session ID"),
     difficulty: Optional[str] = Query(None, description="Filter by difficulty (easy, medium, hard)"),
     skip: int = Query(0, ge=0, description="Number of MCQs to skip"),
@@ -421,7 +431,7 @@ async def list_mcqs(
     """
     List all generated MCQs.
     
-    Optionally filter by subject, session ID, and/or difficulty.
+    Optionally filter by subject, chapter, session ID, and/or difficulty.
     """
     db = await get_async_database()
     
@@ -429,6 +439,8 @@ async def list_mcqs(
     query_filter = {}
     if subject:
         query_filter["subject"] = subject
+    if chapter:
+        query_filter["chapter"] = chapter
     if session_id:
         query_filter["session_id"] = session_id
     if difficulty:
@@ -450,6 +462,7 @@ async def list_mcqs(
             id=str(mcq["_id"]),
             session_id=mcq["session_id"],
             subject=mcq["subject"],
+            chapter=mcq["chapter"],
             question_number=mcq["question_number"],
             concept_id=mcq["concept_id"],
             stem=mcq["stem"],
@@ -519,6 +532,7 @@ async def get_mcq(mcq_id: str):
         id=str(mcq["_id"]),
         session_id=mcq["session_id"],
         subject=mcq["subject"],
+        chapter=mcq["chapter"],
         question_number=mcq["question_number"],
         concept_id=mcq["concept_id"],
         stem=mcq["stem"],

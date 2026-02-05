@@ -37,6 +37,10 @@ class GenerateMCQRequest(BaseModel):
         ...,
         description="Subject name (e.g., 'Calculus - Integration', 'Algebra', 'Physics')"
     )
+    chapter: str = Field(
+        ...,
+        description="Chapter name (e.g., 'Chapter 3 - Definite Integrals', 'Introduction to Limits')"
+    )
     input_type: Literal["chapter", "mcqs"] = Field(
         default="chapter",
         description="Type of input: 'chapter' content or existing 'mcqs'"
@@ -74,6 +78,7 @@ class ConceptDocument(BaseModel):
     worked_example: Optional[str] = None
     session_id: str
     subject: str
+    chapter: str
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
@@ -82,6 +87,7 @@ class MCQDocument(BaseModel):
     id: Optional[PyObjectId] = Field(alias="_id", default=None)
     session_id: str
     subject: str
+    chapter: str
     question_number: int
     concept_id: str
     stem: str
@@ -102,6 +108,7 @@ class MCQSessionDocument(BaseModel):
     id: Optional[PyObjectId] = Field(alias="_id", default=None)
     session_id: str
     subject: str
+    chapter: str
     input_filename: str
     input_type: Literal["chapter", "mcqs"]
     llm_provider: str
@@ -132,6 +139,7 @@ class MCQResponse(BaseModel):
     id: str
     session_id: str
     subject: str
+    chapter: str
     question_number: int
     concept_id: str
     stem: str
@@ -150,6 +158,7 @@ class SessionResponse(BaseModel):
     id: str
     session_id: str
     subject: str
+    chapter: str
     input_filename: str
     input_type: str
     llm_provider: str

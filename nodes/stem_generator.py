@@ -13,6 +13,7 @@ from langchain_core.messages import SystemMessage, HumanMessage
 from langchain_openai import ChatOpenAI
 from langchain_anthropic import ChatAnthropic
 from langchain_google_genai import ChatGoogleGenerativeAI
+from utils.groq_wrapper import ChatGroq
 
 from state import MCQGeneratorState, ConceptJSON, StemWithAnswer
 from utils.latex_validator import validate_latex_syntax, extract_latex_from_markdown
@@ -132,8 +133,8 @@ def stem_generator_node(state: MCQGeneratorState) -> Dict:
     current_batch = state["current_batch"]
     print(f"Processing batch of {len(current_batch)} concepts")
     # Initialize LLM
-    llm_provider = state["config"].get("llm_provider", "gemini")
-    model = state["config"].get("model", "gemini-2.5-pro")
+    llm_provider = state["config"].get("llm_provider", "groq")
+    model = state["config"].get("model", "openai/gpt-oss-120b")
     
     if llm_provider == "anthropic":
         llm = ChatAnthropic(model=model, temperature=0.5)
@@ -141,8 +142,9 @@ def stem_generator_node(state: MCQGeneratorState) -> Dict:
         llm = ChatOpenAI(model=model, temperature=0.5)
     elif llm_provider == "gemini":
         llm = ChatGoogleGenerativeAI(model=model, temperature=0.5)
+    elif llm_provider == "groq":
+        llm = ChatGroq(model=model, temperature=0.5)
     else:
-        raise ValueError(f"Unsupported LLM provider: {llm_provider}")
         raise ValueError(f"Unsupported LLM provider: {llm_provider}")
     
     # Generate stems for each concept in current batch

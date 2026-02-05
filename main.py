@@ -21,16 +21,16 @@ class MCQGenerator:
     
     def __init__(
         self,
-        llm_provider: Literal["anthropic", "openai", "gemini"] = "gemini",
-        model: str = "gemini-2.5-pro",
+        llm_provider: Literal["anthropic", "openai", "gemini", "groq"] = "groq",
+        model: str = "openai/gpt-oss-120b",
         batch_size: int = 15
     ):
         """
         Initialize MCQ Generator.
         
         Args:
-            llm_provider: "anthropic", "openai", or "gemini"
-            model: Model name (e.g., "gemini-2.5-pro", "claude-3-5-sonnet-20241022", "gpt-4")
+            llm_provider: "anthropic", "openai", "gemini", or "groq"
+            model: Model name (e.g., "openai/gpt-oss-120b", "claude-3-5-sonnet-20241022", "gpt-4")
             batch_size: Number of concepts to process per batch (10-15 recommended)
         """
         load_dotenv()
@@ -46,6 +46,8 @@ class MCQGenerator:
             raise ValueError("OPENAI_API_KEY not found in environment")
         if llm_provider == "gemini" and not os.getenv("GOOGLE_API_KEY"):
             raise ValueError("GOOGLE_API_KEY not found in environment")
+        if llm_provider == "groq" and not os.getenv("GROQ_API_KEY"):
+            raise ValueError("GROQ_API_KEY not found in environment")
         
         # Create graph
         self.app = create_mcq_graph()

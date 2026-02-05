@@ -2,7 +2,7 @@
 
 ## Collections Overview
 
-The MCQ Generator uses 3 main collections in MongoDB Atlas:
+The MCQ Generator uses 3 main collections in MongoDB Atlas, organized hierarchically by subject and chapter:
 
 ---
 
@@ -15,11 +15,12 @@ The MCQ Generator uses 3 main collections in MongoDB Atlas:
 {
   _id: ObjectId,                    // Auto-generated MongoDB ID
   session_id: String,               // UUID for session
-  subject: String,                  // Subject name (e.g., "Calculus", "Integration")
+  subject: String,                  // Subject name (e.g., "Calculus")
+  chapter: String,                  // Chapter name (e.g., "Chapter 3 - Definite Integrals")
   input_filename: String,           // Uploaded file name
   input_type: String,               // "chapter" or "mcqs"
-  llm_provider: String,             // "gemini", "anthropic", or "openai"
-  model: String,                    // Model name (e.g., "gemini-2.5-pro")
+  llm_provider: String,             // "groq", "gemini", "anthropic", or "openai"
+  model: String,                    // Model name (e.g., "llama-3.3-70b-versatile")
   batch_size: Number,               // Concepts per batch
   total_concepts_extracted: Number, // Total concepts found
   total_mcqs_generated: Number,     // Total MCQs created
@@ -40,6 +41,8 @@ The MCQ Generator uses 3 main collections in MongoDB Atlas:
 ### Indexes
 - `session_id` (unique)
 - `subject` (for filtering by subject)
+- `chapter` (for filtering by chapter)
+- `(subject, chapter)` (compound index for hierarchical filtering)
 - `status` (for filtering by status)
 - `created_at` (for sorting)
 
@@ -48,16 +51,17 @@ The MCQ Generator uses 3 main collections in MongoDB Atlas:
 {
   "_id": ObjectId("507f1f77bcf86cd799439011"),
   "session_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-  "subject": "Calculus - Integration Techniques",
+  "subject": "Calculus",
+  "chapter": "Chapter 3 - Definite Integrals",
   "input_filename": "chapter3_integration.md",
   "input_type": "chapter",
-  "llm_provider": "gemini",
-  "model": "gemini-2.5-pro",
-  "batch_size": 15,
-  "total_concepts_extracted": 45,
-  "total_mcqs_generated": 45,
+  "llm_provider": "groq",
+  "model": "llama-3.3-70b-versatile",
+  "batch_size": 5,
+  "total_concepts_extracted": 42,
+  "total_mcqs_generated": 42,
   "difficulty_distribution": {
-    "easy": 15,
+    "easy": 14,
     "medium": 25,
     "hard": 5
   },
@@ -86,6 +90,7 @@ The MCQ Generator uses 3 main collections in MongoDB Atlas:
   _id: ObjectId,                    // Auto-generated MongoDB ID
   session_id: String,               // Reference to parent session
   subject: String,                  // Subject name (for easy filtering)
+  chapter: String,                  // Chapter name (for easy filtering)
   question_number: Number,          // Question number in sequence
   concept_id: String,               // Related concept ID
   stem: String,                     // Question text (with LaTeX)
@@ -116,6 +121,8 @@ The MCQ Generator uses 3 main collections in MongoDB Atlas:
 ### Indexes
 - `session_id` (for querying by session)
 - `subject` (for filtering by subject)
+- `chapter` (for filtering by chapter)
+- `(subject, chapter)` (compound index for hierarchical filtering)
 - `metadata.difficulty` (for filtering by difficulty)
 - `question_number` (for sorting)
 
@@ -164,6 +171,7 @@ The MCQ Generator uses 3 main collections in MongoDB Atlas:
   _id: ObjectId,                    // Auto-generated MongoDB ID
   session_id: String,               // Reference to parent session
   subject: String,                  // Subject name
+  chapter: String,                  // Chapter name
   concept_id: String,               // Unique concept identifier
   concept_name: String,             // Human-readable name
   formula: String,                  // LaTeX formula
@@ -178,6 +186,8 @@ The MCQ Generator uses 3 main collections in MongoDB Atlas:
 ### Indexes
 - `session_id` (for querying by session)
 - `subject` (for filtering by subject)
+- `chapter` (for filtering by chapter)
+- `(subject, chapter)` (compound index for hierarchical filtering)
 - `concept_id` (for lookups)
 - `difficulty` (for filtering)
 
@@ -186,7 +196,8 @@ The MCQ Generator uses 3 main collections in MongoDB Atlas:
 {
   "_id": ObjectId("507f1f77bcf86cd799439013"),
   "session_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-  "subject": "Calculus - Integration Techniques",
+  "subject": "Calculus",
+  "chapter": "Chapter 3 - Definite Integrals",
   "concept_id": "u_substitution",
   "concept_name": "U-Substitution Method",
   "formula": "\\int f(g(x))g'(x)dx = \\int f(u)du",
@@ -205,33 +216,72 @@ The MCQ Generator uses 3 main collections in MongoDB Atlas:
 ```
 mcq_sessions (1) ──────► (Many) mcqs
      │                            │
-     │                            └─ Filtered by session_id, subject
+     │                            └─ Filtered by session_id, subject, chapter
      │
      └──────────────────► (Many) concepts
                                   │
-                                  └─ Filtered by session_id, subject
+                                  └─ Filtered by session_id, subject, chapter
 ```
 
 ---
 
-## Queries by Subject
+## Hierarchical Organization
+
+The database is organized hierarchically as:
+
+**Subject → Chapter → Questions**
+
+Example:
+```
+Calculus
+  ├── Chapter 1 - Limits and Continuity
+  │     ├── Session 1 (42 MCQs)
+  │     └── Session 2 (38 MCQs)
+  ├── Chapter 2 - Derivatives
+  │     └── Session 3 (45 MCQs)
+  └── Chapter 3 - Definite Integrals
+        ├── Session 4 (42 MCQs)
+        └── Session 5 (40 MCQs)
+```
+
+This allows efficient querying by:
+- Subject only: Get all questions for "Calculus"
+- Subject + Chapter: Get all questions for "Calculus" → "Chapter 3 - Definite Integrals"
+
+---
+
+## Query Examples
 
 ### Get all sessions for a subject
 ```javascript
-db.mcq_sessions.find({ subject: "Calculus - Integration Techniques" })
+db.mcq_sessions.find({ subject: "Calculus" })
 ```
 
-### Get all MCQs for a subject
+### Get all sessions for a specific chapter
 ```javascript
-db.mcqs.find({ subject: "Calculus - Integration Techniques" })
+db.mcq_sessions.find({ 
+  subject: "Calculus",
+  chapter: "Chapter 3 - Definite Integrals"
+})
 ```
 
-### Get MCQ count by subject and difficulty
+### Get all MCQs for a subject and chapter
+```javascript
+db.mcqs.find({ 
+  subject: "Calculus",
+  chapter: "Chapter 3 - Definite Integrals"
+})
+```
+
+### Get MCQ count by chapter and difficulty
 ```javascript
 db.mcqs.aggregate([
-  { $match: { subject: "Calculus - Integration Techniques" } },
+  { $match: { subject: "Calculus" } },
   { $group: {
-      _id: "$metadata.difficulty",
+      _id: { 
+        chapter: "$chapter",
+        difficulty: "$metadata.difficulty"
+      },
       count: { $sum: 1 }
     }
   }

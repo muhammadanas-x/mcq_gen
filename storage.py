@@ -31,6 +31,7 @@ class MCQStorageService:
     def save_session(
         self,
         subject: str,
+        chapter: str,
         input_filename: str,
         input_type: str,
         llm_provider: str,
@@ -42,7 +43,8 @@ class MCQStorageService:
         Create a new session record in MongoDB.
         
         Args:
-            subject: Subject name (e.g., "Calculus - Integration")
+            subject: Subject name (e.g., "Calculus")
+            chapter: Chapter name (e.g., "Chapter 3 - Definite Integrals")
             input_filename: Name of the input file
             input_type: "chapter" or "mcqs"
             llm_provider: LLM provider used
@@ -56,6 +58,7 @@ class MCQStorageService:
         session_doc = {
             "session_id": self.session_id,
             "subject": subject,
+            "chapter": chapter,
             "input_filename": input_filename,
             "input_type": input_type,
             "llm_provider": llm_provider,
@@ -75,13 +78,14 @@ class MCQStorageService:
         self.db[COLLECTIONS["mcq_sessions"]].insert_one(session_doc)
         return self.session_id
     
-    def save_concepts(self, concepts: List[ConceptJSON], subject: str):
+    def save_concepts(self, concepts: List[ConceptJSON], subject: str, chapter: str):
         """
         Save extracted concepts to MongoDB.
         
         Args:
             concepts: List of ConceptJSON objects
             subject: Subject name
+            chapter: Chapter name
         """
         if not concepts:
             return
@@ -98,19 +102,21 @@ class MCQStorageService:
                 "worked_example": concept.get("worked_example"),
                 "session_id": self.session_id,
                 "subject": subject,
+                "chapter": chapter,
                 "created_at": datetime.utcnow()
             }
             concept_docs.append(doc)
         
         self.db[COLLECTIONS["concepts"]].insert_many(concept_docs)
     
-    def save_mcqs(self, mcqs: List[CompleteMCQ], subject: str):
+    def save_mcqs(self, mcqs: List[CompleteMCQ], subject: str, chapter: str):
         """
         Save generated MCQs to MongoDB.
         
         Args:
             mcqs: List of CompleteMCQ objects
             subject: Subject name
+            chapter: Chapter name
         """
         if not mcqs:
             return
@@ -120,6 +126,7 @@ class MCQStorageService:
             doc = {
                 "session_id": self.session_id,
                 "subject": subject,
+                "chapter": chapter,
                 "question_number": mcq["question_number"],
                 "concept_id": mcq["concept_id"],
                 "stem": mcq["stem"],

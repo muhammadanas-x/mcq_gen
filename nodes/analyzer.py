@@ -18,6 +18,7 @@ from langchain_core.messages import SystemMessage, HumanMessage
 from langchain_openai import ChatOpenAI
 from langchain_anthropic import ChatAnthropic
 from langchain_google_genai import ChatGoogleGenerativeAI
+from utils.groq_wrapper import ChatGroq
 
 from state import MCQGeneratorState, ConceptJSON
 
@@ -282,8 +283,8 @@ def content_analyzer_node(state: MCQGeneratorState) -> Dict:
     print("CONTENT ANALYZER NODE")
     print("="*60)
     # Initialize LLM based on config
-    llm_provider = state["config"].get("llm_provider", "gemini")
-    model = state["config"].get("model", "gemini-2.5-pro")
+    llm_provider = state["config"].get("llm_provider", "groq")
+    model = state["config"].get("model", "openai/gpt-oss-120b")
     
     if llm_provider == "anthropic":
         llm = ChatAnthropic(model=model, temperature=0.3)
@@ -291,6 +292,8 @@ def content_analyzer_node(state: MCQGeneratorState) -> Dict:
         llm = ChatOpenAI(model=model, temperature=0.3)
     elif llm_provider == "gemini":
         llm = ChatGoogleGenerativeAI(model=model, temperature=0.3)
+    elif llm_provider == "groq":
+        llm = ChatGroq(model=model, temperature=0.3)
     else:
         raise ValueError(f"Unsupported LLM provider: {llm_provider}")
     

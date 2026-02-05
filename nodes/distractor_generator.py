@@ -11,6 +11,7 @@ from langchain_core.messages import SystemMessage, HumanMessage
 from langchain_openai import ChatOpenAI
 from langchain_anthropic import ChatAnthropic
 from langchain_google_genai import ChatGoogleGenerativeAI
+from utils.groq_wrapper import ChatGroq
 
 from state import MCQGeneratorState, ValidatedQuestion, Distractor
 from error_taxonomy import get_applicable_errors, ErrorType, ERROR_TAXONOMY
@@ -205,8 +206,8 @@ def distractor_generator_node(state: MCQGeneratorState) -> Dict:
     validated_questions = state["validated_questions"]
     print(f"Generating distractors for {len(validated_questions)} questions")
     # Initialize LLM
-    llm_provider = state["config"].get("llm_provider", "gemini")
-    model = state["config"].get("model", "gemini-2.5-pro")
+    llm_provider = state["config"].get("llm_provider", "groq")
+    model = state["config"].get("model", "openai/gpt-oss-120b")
     
     if llm_provider == "anthropic":
         llm = ChatAnthropic(model=model, temperature=0.7)
@@ -214,8 +215,9 @@ def distractor_generator_node(state: MCQGeneratorState) -> Dict:
         llm = ChatOpenAI(model=model, temperature=0.7)
     elif llm_provider == "gemini":
         llm = ChatGoogleGenerativeAI(model=model, temperature=0.7)
+    elif llm_provider == "groq":
+        llm = ChatGroq(model=model, temperature=0.7)
     else:
-        raise ValueError(f"Unsupported LLM provider: {llm_provider}")
         raise ValueError(f"Unsupported LLM provider: {llm_provider}")
     
     questions_with_distractors = []

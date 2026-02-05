@@ -1,0 +1,775 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "MCQ Generator API",
+    "description": "Generate high-quality multiple-choice questions for calculus/integration topics using LLMs. Supports hierarchical organization by subject and chapter with MongoDB storage.",
+    "version": "1.0.0",
+    "contact": {
+      "name": "MCQ Generator Support"
+    }
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000",
+      "description": "Local development server"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Root",
+      "description": "API information and root endpoint"
+    },
+    {
+      "name": "Health",
+      "description": "Health check and system status"
+    },
+    {
+      "name": "Generation",
+      "description": "MCQ generation endpoints"
+    },
+    {
+      "name": "Sessions",
+      "description": "Session management and retrieval"
+    },
+    {
+      "name": "MCQs",
+      "description": "MCQ retrieval and filtering"
+    },
+    {
+      "name": "Subjects",
+      "description": "Subject listing and statistics"
+    }
+  ],
+  "paths": {
+    "/": {
+      "get": {
+        "tags": ["Root"],
+        "summary": "Root endpoint",
+        "description": "Returns API information and available endpoints",
+        "operationId": "getRoot",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "MCQ Generator API"
+                    },
+                    "version": {
+                      "type": "string",
+                      "example": "1.0.0"
+                    },
+                    "endpoints": {
+                      "type": "object"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "tags": ["Health"],
+        "summary": "Health check",
+        "description": "Verifies API and database connectivity",
+        "operationId": "healthCheck",
+        "responses": {
+          "200": {
+            "description": "System is healthy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service unavailable - database connection failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/generate-mcqs": {
+      "post": {
+        "tags": ["Generation"],
+        "summary": "Generate MCQs from file",
+        "description": "Accepts a markdown file (chapter content or existing MCQs) and generates new MCQs. The generation is synchronous and results are stored in MongoDB organized by subject and chapter. Uses LLM configuration from environment variables.",
+        "operationId": "generateMCQs",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": ["file", "subject", "chapter"],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "Input markdown file (chapter content or existing MCQs)"
+                  },
+                  "subject": {
+                    "type": "string",
+                    "description": "Subject name (e.g., 'Calculus', 'Linear Algebra')",
+                    "example": "Calculus"
+                  },
+                  "chapter": {
+                    "type": "string",
+                    "description": "Chapter name (e.g., 'Chapter 3 - Definite Integrals')",
+                    "example": "Chapter 3 - Definite Integrals"
+                  },
+                  "input_type": {
+                    "type": "string",
+                    "enum": ["chapter", "mcqs"],
+                    "default": "chapter",
+                    "description": "Type of input file"
+                  },
+                  "include_explanations": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Include explanations in generated MCQs"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "MCQs generated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenerateMCQResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions": {
+      "get": {
+        "tags": ["Sessions"],
+        "summary": "List MCQ generation sessions",
+        "description": "Returns paginated list of sessions with optional filtering by subject and/or chapter",
+        "operationId": "listSessions",
+        "parameters": [
+          {
+            "name": "subject",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filter by subject name",
+            "example": "Calculus"
+          },
+          {
+            "name": "chapter",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filter by chapter name",
+            "example": "Chapter 3 - Definite Integrals"
+          },
+          {
+            "name": "skip",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            },
+            "description": "Number of sessions to skip"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 10
+            },
+            "description": "Maximum sessions to return"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionListResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session_id}": {
+      "get": {
+        "tags": ["Sessions"],
+        "summary": "Get session details",
+        "description": "Returns detailed information about a specific MCQ generation session",
+        "operationId": "getSession",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Session UUID",
+            "example": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Session not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/mcqs": {
+      "get": {
+        "tags": ["MCQs"],
+        "summary": "List generated MCQs",
+        "description": "Returns paginated list of MCQs with optional filtering by subject, chapter, session ID, and/or difficulty",
+        "operationId": "listMCQs",
+        "parameters": [
+          {
+            "name": "subject",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filter by subject name",
+            "example": "Calculus"
+          },
+          {
+            "name": "chapter",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filter by chapter name",
+            "example": "Chapter 3 - Definite Integrals"
+          },
+          {
+            "name": "session_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filter by session ID"
+          },
+          {
+            "name": "difficulty",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": ["easy", "medium", "hard"]
+            },
+            "description": "Filter by difficulty level"
+          },
+          {
+            "name": "skip",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            },
+            "description": "Number of MCQs to skip"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 10
+            },
+            "description": "Maximum MCQs to return"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MCQListResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/mcqs/{mcq_id}": {
+      "get": {
+        "tags": ["MCQs"],
+        "summary": "Get MCQ details",
+        "description": "Returns detailed information about a specific MCQ",
+        "operationId": "getMCQ",
+        "parameters": [
+          {
+            "name": "mcq_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "MongoDB ObjectId of the MCQ",
+            "example": "507f1f77bcf86cd799439012"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MCQResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid MCQ ID format",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "MCQ not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/subjects": {
+      "get": {
+        "tags": ["Subjects"],
+        "summary": "List all subjects",
+        "description": "Returns list of all unique subjects with session and MCQ counts",
+        "operationId": "listSubjects",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "total_subjects": {
+                      "type": "integer",
+                      "example": 3
+                    },
+                    "subjects": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "subject": {
+                            "type": "string",
+                            "example": "Calculus"
+                          },
+                          "total_sessions": {
+                            "type": "integer",
+                            "example": 5
+                          },
+                          "total_mcqs": {
+                            "type": "integer",
+                            "example": 210
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "HealthResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "example": "healthy"
+          },
+          "database": {
+            "type": "string",
+            "example": "connected"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "MCQResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "MongoDB ObjectId",
+            "example": "507f1f77bcf86cd799439012"
+          },
+          "session_id": {
+            "type": "string",
+            "description": "Session UUID",
+            "example": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+          },
+          "subject": {
+            "type": "string",
+            "example": "Calculus"
+          },
+          "chapter": {
+            "type": "string",
+            "example": "Chapter 3 - Definite Integrals"
+          },
+          "question_number": {
+            "type": "integer",
+            "example": 1
+          },
+          "concept_id": {
+            "type": "string",
+            "example": "u_substitution"
+          },
+          "stem": {
+            "type": "string",
+            "description": "Question text with LaTeX",
+            "example": "Find $\\int 2x(x^2 + 3)^4 dx$"
+          },
+          "options": {
+            "type": "object",
+            "properties": {
+              "a": {
+                "type": "string",
+                "example": "$\\frac{(x^2+3)^5}{5} + c$"
+              },
+              "b": {
+                "type": "string"
+              },
+              "c": {
+                "type": "string"
+              },
+              "d": {
+                "type": "string"
+              }
+            }
+          },
+          "correct_answer": {
+            "type": "string",
+            "enum": ["a", "b", "c", "d"],
+            "example": "a"
+          },
+          "explanation": {
+            "type": "object",
+            "properties": {
+              "correct": {
+                "type": "string"
+              },
+              "a": {
+                "type": "string"
+              },
+              "b": {
+                "type": "string"
+              },
+              "c": {
+                "type": "string"
+              },
+              "d": {
+                "type": "string"
+              }
+            }
+          },
+          "metadata": {
+            "type": "object",
+            "properties": {
+              "difficulty": {
+                "type": "string",
+                "enum": ["easy", "medium", "hard"],
+                "example": "medium"
+              },
+              "validation_score": {
+                "type": "number",
+                "example": 0.95
+              },
+              "was_corrected": {
+                "type": "boolean",
+                "example": false
+              },
+              "integral_type": {
+                "type": "string",
+                "example": "substitution"
+              }
+            }
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "SessionResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "MongoDB ObjectId"
+          },
+          "session_id": {
+            "type": "string",
+            "description": "Session UUID"
+          },
+          "subject": {
+            "type": "string",
+            "example": "Calculus"
+          },
+          "chapter": {
+            "type": "string",
+            "example": "Chapter 3 - Definite Integrals"
+          },
+          "input_filename": {
+            "type": "string",
+            "example": "chapter3_integration.md"
+          },
+          "input_type": {
+            "type": "string",
+            "enum": ["chapter", "mcqs"]
+          },
+          "llm_provider": {
+            "type": "string",
+            "enum": ["groq", "gemini", "anthropic", "openai"],
+            "example": "groq"
+          },
+          "model": {
+            "type": "string",
+            "example": "llama-3.3-70b-versatile"
+          },
+          "total_concepts_extracted": {
+            "type": "integer",
+            "example": 42
+          },
+          "total_mcqs_generated": {
+            "type": "integer",
+            "example": 42
+          },
+          "difficulty_distribution": {
+            "type": "object",
+            "properties": {
+              "easy": {
+                "type": "integer",
+                "example": 14
+              },
+              "medium": {
+                "type": "integer",
+                "example": 18
+              },
+              "hard": {
+                "type": "integer",
+                "example": 10
+              }
+            }
+          },
+          "status": {
+            "type": "string",
+            "enum": ["processing", "completed", "failed"],
+            "example": "completed"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "completed_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        }
+      },
+      "GenerateMCQResponse": {
+        "type": "object",
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "description": "Session UUID"
+          },
+          "message": {
+            "type": "string",
+            "example": "MCQs generated successfully"
+          },
+          "total_mcqs_generated": {
+            "type": "integer",
+            "example": 42
+          },
+          "difficulty_distribution": {
+            "type": "object",
+            "properties": {
+              "easy": {
+                "type": "integer"
+              },
+              "medium": {
+                "type": "integer"
+              },
+              "hard": {
+                "type": "integer"
+              }
+            }
+          },
+          "metrics": {
+            "type": "object",
+            "properties": {
+              "total_concepts_extracted": {
+                "type": "integer"
+              },
+              "total_mcqs_generated": {
+                "type": "integer"
+              },
+              "validation_rate": {
+                "type": "number"
+              }
+            }
+          },
+          "mcqs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MCQResponse"
+            }
+          },
+          "markdown_content": {
+            "type": "string",
+            "description": "Formatted MCQs in markdown format"
+          }
+        }
+      },
+      "SessionListResponse": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "integer",
+            "description": "Total number of sessions matching filter",
+            "example": 25
+          },
+          "sessions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SessionResponse"
+            }
+          }
+        }
+      },
+      "MCQListResponse": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "integer",
+            "description": "Total number of MCQs matching filter",
+            "example": 210
+          },
+          "mcqs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MCQResponse"
+            }
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "detail": {
+            "type": "string",
+            "description": "Error message"
+          }
+        }
+      }
+    }
+  }
+}
