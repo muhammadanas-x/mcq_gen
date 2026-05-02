@@ -84,10 +84,14 @@ async def ensure_mcq_indexes():
     await mcqs_col.create_index([("subject", 1), ("chapter", 1), ("created_at", -1)])
     await mcqs_col.create_index("user_id")
 
+    dedup_col = db["flashcard_feedback_dedup"]
+    await dedup_col.create_index([("user_id", 1), ("client_event_id", 1)], unique=True)
+
 
 # Collection names
 COLLECTIONS = {
     "mcq_sessions": "mcq_sessions",      # Generation sessions metadata
     "mcqs": "mcqs",                       # Individual MCQs
     "concepts": "concepts",               # Extracted concepts
+    "flashcard_feedback_dedup": "flashcard_feedback_dedup",
 }

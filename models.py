@@ -198,6 +198,7 @@ class GenerateMCQResponse(BaseModel):
     difficulty_hint_applied: Optional[str] = None
     topic_key: Optional[str] = None
     sub_topic_key: Optional[str] = None
+    weak_focus_markdown: Optional[str] = None
 
 
 class MCQListResponse(BaseModel):
@@ -220,3 +221,34 @@ class HealthResponse(BaseModel):
 
     class Config:
         json_encoders = {datetime: lambda v: v.isoformat()}
+
+
+class FlashcardAttemptItem(BaseModel):
+    """One flashcard interaction for a single MCQ."""
+
+    mcq_id: Optional[str] = Field(None, description="api_mcq_id from generation response, e.g. sessionuuid_3")
+    question_number: Optional[int] = Field(None, ge=1, description="Fallback if mcq_id not sent")
+    selected: Optional[Literal["a", "b", "c", "d"]] = Field(None, description="Learner choice; omit if skipped")
+    revealed_answer: bool = Field(False, description="Whether the learner revealed the correct answer")
+
+
+class FlashcardFeedbackRequest(BaseModel):
+    """Submit flashcard practice outcomes for Pinecone weak_concepts personalization."""
+
+    session_id: str = Field(..., min_length=8)
+    user_id: Optional[str] = Field(None, description="Body user id; can also use X-User-Id header")
+    attempts: List[FlashcardAttemptItem] = Field(..., min_length=1)
+    client_event_id: Optional[str] = Field(
+        None,
+        description="Idempotency key (e.g. UUID); duplicate submissions are ignored",
+    )
+
+
+class FlashcardFeedbackResponse(BaseModel):
+    message: str
+    weak_concepts_count: int = 0
+    last_score: Optional[float] = None
+    wrong_count: int = 0
+    total_graded: int = 0
+    pinecone_upserted: bool = False
+    duplicate_event: bool = False

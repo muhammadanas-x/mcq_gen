@@ -1,138 +1,17 @@
 ================================================================================
 CONTENT ANALYZER - EXTRACTED CONCEPTS
 ================================================================================
-Timestamp: 2026-05-02 13:30:58
-Input Source: C:\Users\midni\AppData\Local\Temp\tmphjoecji0.md
+Timestamp: 2026-05-03 01:06:20
+Input Source: C:\Users\midni\AppData\Local\Temp\tmp8tw0xxdm.md
 Input Type: chapter
 LLM Provider: openai
 Model: meta-llama/llama-3-8b-instruct
-Total Concepts Extracted: 11
+Total Concepts Extracted: 0
 ================================================================================
 
 DIFFICULTY DISTRIBUTION:
 --------------------------------------------------------------------------------
-  EASY: 6 concepts
-  MEDIUM: 4 concepts
-  HARD: 1 concepts
-
-
-================================================================================
-CONCEPT 1: Domain of a Function
-================================================================================
-ID: domain_function
-Difficulty: easy
-Prerequisites: function
-
-Context:
-The domain of a function is the set of input values for which the function is defined. It is the set of all x-values for which the function is a valid mathematical expression.
-
-
-================================================================================
-CONCEPT 2: Range of a Function
-================================================================================
-ID: range_function
-Difficulty: easy
-Prerequisites: function
-
-Context:
-The range of a function is the set of output values that the function can produce. It is the set of all y-values that the function can take.
-
-
-================================================================================
-CONCEPT 3: Domain and Range of a Function
-================================================================================
-ID: domain_range_function
-Difficulty: medium
-Prerequisites: domain_function, range_function
-
-Context:
-When finding the domain and range of a function, we need to consider the values of x and y that make the function valid and the values that the function can produce.
-
-
-================================================================================
-CONCEPT 4: Domain of a Function: Infinite
-================================================================================
-ID: domain_infinite
-Difficulty: easy
-Prerequisites: domain_function
-
-Context:
-A function can have an infinite domain if it is defined for all real numbers.
-
-
-================================================================================
-CONCEPT 5: Domain of a Function: Finite
-================================================================================
-ID: domain_finite
-Difficulty: easy
-Prerequisites: domain_function
-
-Context:
-A function can have a finite domain if it is only defined for a specific set of values.
-
-
-================================================================================
-CONCEPT 6: Range of a Function: Finite
-================================================================================
-ID: range_finite
-Difficulty: easy
-Prerequisites: range_function
-
-Context:
-A function can have a finite range if it only produces a specific set of values.
-
-
-================================================================================
-CONCEPT 7: Range of a Function: Infinite
-================================================================================
-ID: range_infinite
-Difficulty: easy
-Prerequisites: range_function
-
-Context:
-A function can have an infinite range if it can produce all real numbers.
-
-
-================================================================================
-CONCEPT 8: Domain and Range Intersection
-================================================================================
-ID: domain_range_intersection
-Difficulty: medium
-Prerequisites: domain_function, range_function
-
-Context:
-When finding the intersection of the domain and range of a function, we need to consider the values that the function is defined for and the values it produces.
-
-
-================================================================================
-CONCEPT 9: Domain and Range Union
-================================================================================
-ID: domain_range_union
-Difficulty: medium
-Prerequisites: domain_function, range_function
-
-Context:
-When finding the union of the domain and range of a function, we need to consider the values that the function is defined for and the values it produces.
-
-
-================================================================================
-CONCEPT 10: Domain and Range Difference
-================================================================================
-ID: domain_range_difference
-Difficulty: medium
-Prerequisites: domain_function, range_function
-
-Context:
-When finding the difference of the domain and range of a function, we need to consider the values that the function is defined for and the values it produces.
-
-
-================================================================================
-CONCEPT 11: Domain and Range Complement
-================================================================================
-ID: domain_range_complement
-Difficulty: hard
-Prerequisites: domain_function, range_function
-
-Context:
-When finding the complement of the domain and range of a function, we need to consider the values that the function is not defined for and the values it does not produce.
+  EASY: 0 concepts
+  MEDIUM: 0 concepts
+  HARD: 0 concepts
 

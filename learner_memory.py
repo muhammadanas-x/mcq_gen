@@ -15,6 +15,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 # Pinecone embedding model (1048-dim index required in Pinecone console)
 DEFAULT_EMBED_MODEL = "llama-text-embed-v2"
+DEFAULT_RAG_MIN_SCORE = 0.1
 
 _pc = None
 _index = None
@@ -35,6 +36,16 @@ def topic_subtopic_from_strings(topic: str, sub_topic: str) -> Tuple[str, str, s
     td = (topic or "").strip()
     sd = (sub_topic or "").strip()
     return td, sd, normalize_key(td), normalize_key(sd)
+
+
+def memory_lane_embed_text(topic_key: str, sub_topic_key: str, user_id: str = "") -> str:
+    """Text embedded for learner-memory queries: user + topic lane (personalized)."""
+    tk = (topic_key or "").strip()
+    sk = (sub_topic_key or "").strip()
+    uk = normalize_key(user_id or "")
+    if uk:
+        return f"user:{uk} | [{tk}] > [{sk}]"
+    return f"[{tk}] > [{sk}]"
 
 
 def split_tutor_topic(tutor_topic: Optional[str]) -> Tuple[str, str]:
@@ -140,12 +151,58 @@ def build_memory_block(learner_context: str, difficulty_hint: str) -> str:
     return "\n".join(lines)
 
 
+def weak_fragments_from_metadata(meta: Dict[str, Any]) -> List[str]:
+    """Unpack weak_concepts from Pinecone metadata (JSON array string or plain text)."""
+    raw = meta.get("weak_concepts")
+    out: List[str] = []
+    if raw is None:
+        return out
+    s = str(raw).strip()
+    if not s or s.lower() in ("none", "null", "[]"):
+        return out
+    try:
+        parsed = json.loads(s)
+        if isinstance(parsed, list):
+            for x in parsed:
+                t = " ".join(str(x).split()).strip()
+                if t:
+                    out.append(t)
+            return out[:30]
+        if isinstance(parsed, dict):
+            for v in parsed.values():
+                t = " ".join(str(v).split()).strip()
+                if t:
+                    out.append(t)
+            return out[:30]
+    except (json.JSONDecodeError, TypeError, ValueError):
+        pass
+    if s:
+        out.append(s[:2000])
+    return out
+
+
+def compose_learner_prefix_for_generation(bundle: Dict[str, Any]) -> str:
+    """Markdown prefix for temp chapter file and direct JSON prompts (weak focus + memory block)."""
+    parts: List[str] = []
+    wf = (bundle.get("weak_focus_markdown") or "").strip()
+    if wf:
+        parts.append(wf)
+    blk = build_memory_block(
+        bundle.get("learner_context") or "",
+        bundle.get("difficulty_hint") or "medium",
+    ).strip()
+    if blk:
+        parts.append(blk)
+    return "\n\n".join(parts).strip()
+
+
 def query_memory_bundle(
     user_id: Optional[str],
     topic_key: str,
     sub_topic_key: str,
     query_text: str,
     top_k: int = 8,
+    min_score: float = DEFAULT_RAG_MIN_SCORE,
 ) -> Dict[str, Any]:
     """
     Retrieve prior vectors for same user + canonical topic lane; embed query_text for similarity.
@@ -156,6 +213,7 @@ def query_memory_bundle(
         "difficulty_hint": "medium",
         "memory_hits": 0,
         "top_scores": [],
+        "weak_focus_markdown": "",
     }
     uid = (user_id or "").strip()
     if not uid or not topic_key or not is_configured():
@@ -164,7 +222,8 @@ def query_memory_bundle(
     if idx is None:
         return out
 
-    qvec = embed_query(query_text or f"{topic_key} {sub_topic_key}")
+    lane = memory_lane_embed_text(topic_key, sub_topic_key, uid)
+    qvec = embed_query(f"{lane} | {(query_text or '').strip()}"[:8000])
     if not qvec:
         return out
 
@@ -183,19 +242,46 @@ def query_memory_bundle(
         md = dict(m.metadata or {})
         matches.append({"score": float(m.score or 0.0), "metadata": md})
 
-    out["memory_hits"] = len(matches)
     out["top_scores"] = [round(x["score"], 4) for x in matches[:5]]
+    filtered_matches = [m for m in matches if float(m.get("score") or 0.0) > float(min_score)]
+    out["memory_hits"] = len(filtered_matches)
 
     snippets: List[str] = []
-    for i, m in enumerate(matches[:6], start=1):
+    for i, m in enumerate(filtered_matches, start=1):
         md = m["metadata"]
-        src = md.get("source", "")
-        pr = str(md.get("prompt", ""))[:400]
         ex = str(md.get("excerpt", ""))[:300]
-        snippets.append(f"{i}. [{src}] {pr}\n   excerpt: {ex}")
+        if not ex.strip():
+            continue
+        snippets.append(f"{i}. excerpt: {ex}")
 
     out["learner_context"] = "\n".join(snippets).strip()
-    out["difficulty_hint"] = difficulty_hint_from_matches(matches)
+    out["difficulty_hint"] = difficulty_hint_from_matches(filtered_matches)
+
+    # Weak concepts from retrieved metadata (for personalized remediation prompts)
+    focus_lines: List[str] = []
+    seen: set[str] = set()
+    max_bullets = 16
+    for rank, m in enumerate(filtered_matches, start=1):
+        md = m.get("metadata") or {}
+        sid = str(md.get("session_id", "") or "")[:36]
+        for frag in weak_fragments_from_metadata(md):
+            nk = frag[:400]
+            if nk in seen:
+                continue
+            seen.add(nk)
+            label = f"hit {rank} session `{sid}`" if sid else f"hit {rank}"
+            focus_lines.append(f"- **{label}:** {frag[:900]}")
+            if len(focus_lines) >= max_bullets:
+                break
+        if len(focus_lines) >= max_bullets:
+            break
+    if focus_lines:
+        out["weak_focus_markdown"] = (
+            "## RAG: weak concepts from prior flashcard practice (top retrieved)\n\n"
+            "**Instruction for generation:** At least half of new MCQs should remediate these misconceptions "
+            "(novel stems and numbers; stay within topic).\n\n"
+            + "\n".join(focus_lines)
+        )
     return out
 
 
@@ -210,6 +296,8 @@ def upsert_memory_record(
     excerpt: str = "",
     weak_concepts: Optional[List[str]] = None,
     last_score: Optional[float] = None,
+    wrong_count: Optional[int] = None,
+    total_attempted: Optional[int] = None,
 ) -> Optional[str]:
     """Upsert one vector; returns vector id or None if skipped/failed."""
     uid = (user_id or "").strip()
@@ -224,7 +312,10 @@ def upsert_memory_record(
     if weak_concepts:
         weak_str = json.dumps(weak_concepts[:20], ensure_ascii=False)
 
-    text = f"[{td}] > [{sd}] | prompt: {prompt[:2000]} | source: {source} | weak: {weak_str} | excerpt: {(excerpt or '')[:1500]}"
+    lane = memory_lane_embed_text(tk, sk, uid)
+    text = (
+        f"{lane} | prompt: {prompt[:2000]} | source: {source} | weak: {weak_str} | excerpt: {(excerpt or '')[:1500]}"
+    )
 
     vec = embed_passage(text)
     if not vec:
@@ -249,6 +340,17 @@ def upsert_memory_record(
             meta["last_score"] = float(last_score)
         except (TypeError, ValueError):
             pass
+    if wrong_count is not None:
+        try:
+            meta["wrong_count"] = int(wrong_count)
+        except (TypeError, ValueError):
+            pass
+    if total_attempted is not None:
+        try:
+            meta["total_attempted"] = int(total_attempted)
+        except (TypeError, ValueError):
+            pass
+    meta["practice_at"] = __import__("datetime").datetime.utcnow().isoformat() + "Z"
 
     try:
         idx.upsert(vectors=[{"id": vid, "values": vec, "metadata": meta}])
