@@ -86,14 +86,17 @@ class MCQDocument(BaseModel):
     """MongoDB document for complete MCQs"""
     id: Optional[PyObjectId] = Field(alias="_id", default=None)
     session_id: str
+    user_id: Optional[str] = None
     subject: str
     chapter: str
+    generation_query: Optional[str] = None
     question_number: int
     concept_id: str
     stem: str
     options: Dict[str, str]  # {"a": "...", "b": "...", "c": "...", "d": "..."}
     correct_answer: Literal["a", "b", "c", "d"]
     explanation: Dict[str, str]  # {"correct": "...", "a": "...", "b": "...", etc}
+    answer_grading: Optional[Dict] = None
     metadata: Dict  # difficulty, validation scores, etc
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
@@ -107,8 +110,10 @@ class MCQSessionDocument(BaseModel):
     """MongoDB document for generation sessions"""
     id: Optional[PyObjectId] = Field(alias="_id", default=None)
     session_id: str
+    user_id: Optional[str] = None
     subject: str
     chapter: str
+    generation_query: Optional[str] = None
     input_filename: str
     input_type: Literal["chapter", "mcqs"]
     llm_provider: str
@@ -119,6 +124,7 @@ class MCQSessionDocument(BaseModel):
     difficulty_distribution: Dict[str, int]
     validation_rate: float
     metrics: Dict
+    first_attempt_summary: Optional[Dict] = None
     status: Literal["processing", "completed", "failed"] = "processing"
     error_message: Optional[str] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
@@ -146,6 +152,7 @@ class MCQResponse(BaseModel):
     options: Dict[str, str]
     correct_answer: str
     explanation: Dict[str, str]
+    answer_grading: Optional[Dict] = None
     metadata: Dict
     created_at: datetime
 
@@ -157,8 +164,10 @@ class SessionResponse(BaseModel):
     """Response model for generation session"""
     id: str
     session_id: str
+    user_id: Optional[str] = None
     subject: str
     chapter: str
+    generation_query: Optional[str] = None
     input_filename: str
     input_type: str
     llm_provider: str
@@ -166,6 +175,7 @@ class SessionResponse(BaseModel):
     total_concepts_extracted: int
     total_mcqs_generated: int
     difficulty_distribution: Dict[str, int]
+    first_attempt_summary: Optional[Dict] = None
     status: str
     created_at: datetime
     completed_at: Optional[datetime] = None
@@ -183,6 +193,11 @@ class GenerateMCQResponse(BaseModel):
     metrics: Dict
     mcqs: List[MCQResponse]
     markdown_content: str
+    learner_memory_enabled: Optional[bool] = None
+    memory_hits: Optional[int] = None
+    difficulty_hint_applied: Optional[str] = None
+    topic_key: Optional[str] = None
+    sub_topic_key: Optional[str] = None
 
 
 class MCQListResponse(BaseModel):

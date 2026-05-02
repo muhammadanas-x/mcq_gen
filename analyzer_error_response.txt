@@ -1,175 +1,188 @@
+Here is the extracted concepts in JSON format:
+
 ```json
 [
   {
-    "concept_id": "integration_by_substitution",
-    "concept_name": "Integration by Substitution",
-    "formula": "$\int f(g(x)) \cdot g'(x) dx = \int f(u) du$",
-    "difficulty": "medium",
-    "prerequisites": ["integration_basics"],
-    "context": "Used to integrate composite functions. Substitute $u = g(x)$ and $du = g'(x) dx$ to simplify the integral.",
-    "worked_example": "Find $\int (2x+1)^5 dx$ using substitution."
-  },
-  {
-    "concept_id": "integration_by_parts",
-    "concept_name": "Integration by Parts",
-    "formula": "$\int u dv = uv - \int v du$",
-    "difficulty": "medium",
-    "prerequisites": ["integration_basics"],
-    "context": "Used to integrate products of functions. Choose $u$ and $dv$ to simplify the integral.",
-    "worked_example": "Find $\int x \sin x dx$ using integration by parts."
-  },
-  {
-    "concept_id": "trigonometric_integration",
-    "concept_name": "Trigonometric Integration",
-    "formula": "$\int \sin^2 x dx = \frac{1}{2}x - \frac{1}{4}\sin 2x + C$",
-    "difficulty": "medium",
-    "prerequisites": ["trigonometry"],
-    "context": "Used to integrate trigonometric functions. Apply trigonometric identities to simplify the integral.",
-    "worked_example": "Find $\int \sin^2 x dx$ using trigonometric identities."
-  },
-  {
-    "concept_id": "exponential_integration",
-    "concept_name": "Exponential Integration",
-    "formula": "$\int e^{ax} dx = \frac{1}{a}e^{ax} + C$",
+    "concept_id": "slope_definition",
+    "concept_name": "Slope of a Line",
+    "formula": "$m = \\frac{y_2 - y_1}{x_2 - x_1}$",
     "difficulty": "easy",
-    "prerequisites": ["integration_basics"],
-    "context": "Used to integrate exponential functions. Recognize the general form of an exponential integral.",
-    "worked_example": "Find $\int e^{2x} dx$."
+    "prerequisites": ["coordinate geometry"],
+    "context": "The slope of a line is a measure of how steep it is. It's calculated as the ratio of vertical change to horizontal change between two points on the line.",
+    "worked_example": "Find the slope of the line passing through points (2,3) and (4,5)"
   },
   {
-    "concept_id": "logarithmic_integration",
-    "concept_name": "Logarithmic Integration",
-    "formula": "$\int \frac{1}{x} dx = \ln|x| + C$",
+    "concept_id": "slope_interpretation",
+    "concept_name": "Interpreting Slope",
+    "formula": "",
     "difficulty": "easy",
-    "prerequisites": ["integration_basics"],
-    "context": "Used to integrate logarithmic functions. Recognize the general form of a logarithmic integral.",
-    "worked_example": "Find $\int \frac{1}{x} dx$."
+    "prerequisites": ["slope_definition"],
+    "context": "Slope can be interpreted as a rate of change or a measure of steepness. A positive slope indicates an increasing function, while a negative slope indicates a decreasing function.",
+    "worked_example": ""
   },
   {
-    "concept_id": "integration_of_rational_functions",
-    "concept_name": "Integration of Rational Functions",
-    "formula": "$\int \frac{1}{x^2+1} dx = \tan^{-1}x + C$",
+    "concept_id": "positive_slope",
+    "concept_name": "Positive Slope",
+    "formula": "",
+    "difficulty": "easy",
+    "prerequisites": ["slope_interpretation"],
+    "context": "A line with a positive slope is increasing. This means that as x increases, y also increases.",
+    "worked_example": ""
+  },
+  {
+    "concept_id": "negative_slope",
+    "concept_name": "Negative Slope",
+    "formula": "",
+    "difficulty": "easy",
+    "prerequisites": ["slope_interpretation"],
+    "context": "A line with a negative slope is decreasing. This means that as x increases, y decreases.",
+    "worked_example": ""
+  },
+  {
+    "concept_id": "zero_slope",
+    "concept_name": "Zero Slope",
+    "formula": "",
+    "difficulty": "easy",
+    "prerequisites": ["slope_interpretation"],
+    "context": "A line with a zero slope is horizontal. This means that y remains constant as x changes.",
+    "worked_example": ""
+  },
+  {
+    "concept_id": "undefined_slope",
+    "concept_name": "Undefined Slope",
+    "formula": "",
+    "difficulty": "easy",
+    "prerequisites": ["slope_definition"],
+    "context": "A line with an undefined slope is vertical. This means that x remains constant as y changes.",
+    "worked_example": ""
+  },
+  {
+    "concept_id": "point_slope_form",
+    "concept_name": "Point-Slope Form",
+    "formula": "$y - y_1 = m(x - x_1)$",
     "difficulty": "medium",
-    "prerequisites": ["integration_basics", "partial_fractions"],
-    "context": "Used to integrate rational functions. Apply partial fractions or recognize standard forms.",
-    "worked_example": "Find $\int \frac{1}{x^2+1} dx$."
+    "prerequisites": ["slope_definition"],
+    "context": "The point-slope form of a line is a way to write the equation of a line given a point and the slope. It's useful for finding the equation of a line that passes through a given point and has a known slope.",
+    "worked_example": "Find the equation of the line passing through (2,3) with slope 2"
   },
   {
-    "concept_id": "improper_integrals",
-    "concept_name": "Improper Integrals",
-    "formula": "$\int_{-\infty}^{\infty} f(x) dx = \lim_{a \to -\infty} \int_{a}^{b} f(x) dx + \lim_{b \to \infty} \int_{c}^{b} f(x) dx$",
-    "difficulty": "hard",
-    "prerequisites": ["integration_basics"],
-    "context": "Used to evaluate integrals with infinite limits. Apply limits to evaluate the integral.",
-    "worked_example": "Find $\int_{-\infty}^{\infty} \frac{1}{1+x^2} dx$."
-  },
-  {
-    "concept_id": "area_between_curves",
-    "concept_name": "Area Between Curves",
-    "formula": "$A = \int_{a}^{b} (f(x) - g(x)) dx$",
+    "concept_id": "slope_intercept_form",
+    "concept_name": "Slope-Intercept Form",
+    "formula": "$y = mx + b$",
     "difficulty": "medium",
-    "prerequisites": ["integration_basics"],
-    "context": "Used to find the area between two curves. Identify the upper and lower curves and integrate the difference.",
-    "worked_example": "Find the area between $y = x^2$ and $y = 2x$ from $x = 0$ to $x = 2$."
+    "prerequisites": ["slope_definition"],
+    "context": "The slope-intercept form of a line is a way to write the equation of a line given the slope and the y-intercept. It's useful for finding the equation of a line that passes through the origin and has a known slope.",
+    "worked_example": "Find the equation of the line with slope 2 and y-intercept 3"
   },
   {
-    "concept_id": "volume_of_solids",
-    "concept_name": "Volume of Solids",
-    "formula": "$V = \pi \int_{a}^{b} (f(x))^2 dx$",
+    "concept_id": "equation_of_line",
+    "concept_name": "Equation of a Line",
+    "formula": "",
     "difficulty": "medium",
-    "prerequisites": ["integration_basics"],
-    "context": "Used to find the volume of a solid of revolution. Apply the disk or washer method.",
-    "worked_example": "Find the volume of the solid formed by revolving $y = x^2$ about the x-axis from $x = 0$ to $x = 2$."
+    "prerequisites": ["point_slope_form", "slope_intercept_form"],
+    "context": "The equation of a line can be written in various forms, including point-slope form and slope-intercept form. Each form has its own advantages and disadvantages.",
+    "worked_example": ""
   },
   {
-    "concept_id": "surface_area",
-    "concept_name": "Surface Area",
-    "formula": "$S = 2\pi \int_{a}^{b} f(x) \sqrt{1 + (f'(x))^2} dx$",
-    "difficulty": "hard",
-    "prerequisites": ["integration_basics"],
-    "context": "Used to find the surface area of a solid of revolution. Apply the formula for surface area.",
-    "worked_example": "Find the surface area of the solid formed by revolving $y = x^2$ about the x-axis from $x = 0$ to $x = 2$."
-  },
-  {
-    "concept_id": "integration_with_respect_to_parameters",
-    "concept_name": "Integration with Respect to Parameters",
-    "formula": "$\frac{d}{dt} \int_{a(t)}^{b(t)} f(x,t) dx = \int_{a(t)}^{b(t)} \frac{\partial f}{\partial t} dx + f(b(t),t) \cdot b'(t) - f(a(t),t) \cdot a'(t)$",
-    "difficulty": "hard",
-    "prerequisites": ["integration_basics"],
-    "context": "Used to differentiate integrals with respect to parameters. Apply the Leibniz rule.",
-    "worked_example": "Find $\frac{d}{dt} \int_{0}^{t} x^2 dx$."
-  },
-  {
-    "concept_id": "differential_equations",
-    "concept_name": "Differential Equations",
-    "formula": "$\frac{dy}{dx} = f(x,y)$",
-    "difficulty": "hard",
-    "prerequisites": ["integration_basics"],
-    "context": "Used to model rates of change. Solve the differential equation to find the general solution.",
-    "worked_example": "Solve $\frac{dy}{dx} = 2x$."
-  },
-  {
-    "concept_id": "separable_differential_equations",
-    "concept_name": "Separable Differential Equations",
-    "formula": "$\frac{dy}{dx} = f(x) \cdot g(y)$",
+    "concept_id": "parallel_lines",
+    "concept_name": "Parallel Lines",
+    "formula": "",
     "difficulty": "medium",
-    "prerequisites": ["differential_equations"],
-    "context": "Used to solve differential equations where the variables can be separated. Integrate both sides to find the general solution.",
-    "worked_example": "Solve $\frac{dy}{dx} = 2x \cdot y$."
+    "prerequisites": ["equation_of_line"],
+    "context": "Parallel lines have the same slope but different y-intercepts. They never intersect and are always equidistant from each other.",
+    "worked_example": ""
   },
   {
-    "concept_id": "first_order_linear_differential_equations",
-    "concept_name": "First-Order Linear Differential Equations",
-    "formula": "$\frac{dy}{dx} + P(x)y = Q(x)$",
+    "concept_id": "perpendicular_lines",
+    "concept_name": "Perpendicular Lines",
+    "formula": "",
     "difficulty": "medium",
-    "prerequisites": ["differential_equations"],
-    "context": "Used to solve first-order linear differential equations. Apply an integrating factor to find the general solution.",
-    "worked_example": "Solve $\frac{dy}{dx} + 2y = 3$."
+    "prerequisites": ["equation_of_line"],
+    "context": "Perpendicular lines have slopes that are negative reciprocals of each other. They intersect at a right angle (90 degrees).",
+    "worked_example": ""
   },
   {
-    "concept_id": "higher_order_linear_differential_equations",
-    "concept_name": "Higher-Order Linear Differential Equations",
-    "formula": "$a_n \frac{d^n y}{dx^n} + a_{n-1} \frac{d^{n-1} y}{dx^{n-1}} + \cdots + a_1 \frac{dy}{dx} + a_0 y = 0$",
-    "difficulty": "hard",
-    "prerequisites": ["differential_equations"],
-    "context": "Used to solve higher-order linear differential equations. Apply the characteristic equation to find the general solution.",
-    "worked_example": "Solve $y'' + 4y' + 3y = 0$."
+    "concept_id": "line_segments",
+    "concept_name": "Line Segments",
+    "formula": "",
+    "difficulty": "medium",
+    "prerequisites": ["equation_of_line"],
+    "context": "A line segment is a part of a line that has a specific starting and ending point. It can be represented by an equation and has a slope and y-intercept.",
+    "worked_example": ""
   },
   {
-    "concept_id": "system_of_differential_equations",
-    "concept_name": "System of Differential Equations",
-    "formula": "$\frac{dx}{dt} = f(x,y)$, $\frac{dy}{dt} = g(x,y)$",
+    "concept_id": "distance_formula",
+    "concept_name": "Distance Formula",
+    "formula": "$d = \sqrt{(x_2 - x_1)^2 + (y_2 - y_1)^2}$",
     "difficulty": "hard",
-    "prerequisites": ["differential_equations"],
-    "context": "Used to model systems of interacting quantities. Solve the system of differential equations to find the general solution.",
-    "worked_example": "Solve $\frac{dx}{dt} = 2x - y$, $\frac{dy}{dt} = x + 3y$."
+    "prerequisites": ["coordinate_geometry"],
+    "context": "The distance formula is used to find the distance between two points in a coordinate plane. It's a fundamental concept in geometry and is used in various applications.",
+    "worked_example": "Find the distance between points (2,3) and (4,5)"
   },
   {
-    "concept_id": "laplace_transform",
-    "concept_name": "Laplace Transform",
-    "formula": "$F(s) = \int_{0}^{\infty} f(t)e^{-st} dt$",
+    "concept_id": "midpoint_formula",
+    "concept_name": "Midpoint Formula",
+    "formula": "((x_1 + x_2)/2, (y_1 + y_2)/2)",
     "difficulty": "hard",
-    "prerequisites": ["integration_basics"],
-    "context": "Used to solve differential equations and integral equations. Apply the Laplace transform to find the solution.",
-    "worked_example": "Find the Laplace transform of $f(t) = t^2$."
+    "prerequisites": ["coordinate_geometry"],
+    "context": "The midpoint formula is used to find the midpoint of a line segment. It's a fundamental concept in geometry and is used in various applications.",
+    "worked_example": "Find the midpoint of the line segment with endpoints (2,3) and (4,5)"
   },
   {
-    "concept_id": "fourier_series",
-    "concept_name": "Fourier Series",
-    "formula": "$f(x) = \frac{a_0}{2} + \sum_{n=1}^{\infty} (a_n \cos nx + b_n \sin nx)$",
+    "concept_id": "circumcenter",
+    "concept_name": "Circumcenter",
+    "formula": "",
     "difficulty": "hard",
-    "prerequisites": ["integration_basics"],
-    "context": "Used to represent periodic functions as a sum of sine and cosine terms. Apply the Fourier series to find the representation.",
-    "worked_example": "Find the Fourier series of $f(x) = x$ on $[-\pi, \pi]$."
+    "prerequisites": ["coordinate_geometry"],
+    "context": "The circumcenter is the point where the perpendicular bisectors of the sides of a triangle intersect. It's a fundamental concept in geometry and is used in various applications.",
+    "worked_example": ""
   },
   {
-    "concept_id": "partial_differential_equations",
-    "concept_name": "Partial Differential Equations",
-    "formula": "$\frac{\partial u}{\partial t} = \alpha \frac{\partial^2 u}{\partial x^2}$",
+    "concept_id": "orthocenter",
+    "concept_name": "Orthocenter",
+    "formula": "",
     "difficulty": "hard",
-    "prerequisites": ["differential_equations"],
-    "context": "Used to model phenomena that depend on multiple variables. Solve the partial differential equation to find the general solution.",
-    "worked_example": "Solve $\frac{\partial u}{\partial t} = \frac{\partial^2 u}{\partial x^2}$."
+    "prerequisites": ["coordinate_geometry"],
+    "context": "The orthocenter is the point where the altitudes of a triangle intersect. It's a fundamental concept in geometry and is used in various applications.",
+    "worked_example": ""
+  },
+  {
+    "concept_id": "centroid",
+    "concept_name": "Centroid",
+    "formula": "",
+    "difficulty": "hard",
+    "prerequisites": ["coordinate_geometry"],
+    "context": "The centroid is the point where the medians of a triangle intersect. It's a fundamental concept in geometry and is used in various applications.",
+    "worked_example": ""
+  },
+  {
+    "concept_id": "incenter",
+    "concept_name": "Incenter",
+    "formula": "",
+    "difficulty": "hard",
+    "prerequisites": ["coordinate_geometry"],
+    "context": "The incenter is the point where the angle bisectors of a triangle intersect. It's a fundamental concept in geometry and is used in various applications.",
+    "worked_example": ""
+  },
+  {
+    "concept_id": "incircle",
+    "concept_name": "Incircle",
+    "formula": "",
+    "difficulty": "hard",
+    "prerequisites": ["coordinate_geometry"],
+    "context": "The incircle is the circle that is tangent to all three sides of a triangle. It's a fundamental concept in geometry and is used in various applications.",
+    "worked_example": ""
+  },
+  {
+    "concept_id": "circumcircle",
+    "concept_name": "Circumcircle",
+    "formula": "",
+    "difficulty": "hard",
+    "prerequisites": ["coordinate_geometry"],
+    "context": "The circumcircle is the circle that passes through all three vertices of a triangle. It's a fundamental concept in geometry and is used in various applications.",
+    "worked_example": ""
   }
 ]
 ```
+
+This list covers major topics in analytical geometry, including slope, line equations, parallel and perpendicular lines, line segments, distance formula, midpoint formula, and various geometric concepts. Each concept is testable as a single MCQ and has a difficulty level and prerequisites.

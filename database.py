@@ -67,6 +67,24 @@ async def close_async_database():
         _async_client.close()
 
 
+async def ensure_mcq_indexes():
+    """
+    Ensure indexes used by API read/write paths exist.
+    Safe to call repeatedly on startup.
+    """
+    db = await get_async_database()
+    sessions_col = db[COLLECTIONS["mcq_sessions"]]
+    mcqs_col = db[COLLECTIONS["mcqs"]]
+
+    await sessions_col.create_index("session_id", unique=True)
+    await sessions_col.create_index("user_id")
+    await sessions_col.create_index([("subject", 1), ("chapter", 1), ("created_at", -1)])
+
+    await mcqs_col.create_index([("session_id", 1), ("question_number", 1)], unique=True)
+    await mcqs_col.create_index([("subject", 1), ("chapter", 1), ("created_at", -1)])
+    await mcqs_col.create_index("user_id")
+
+
 # Collection names
 COLLECTIONS = {
     "mcq_sessions": "mcq_sessions",      # Generation sessions metadata
