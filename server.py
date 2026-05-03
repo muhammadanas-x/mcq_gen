@@ -135,21 +135,72 @@ async def _prepend_learner_memory_file(
     return await asyncio.to_thread(_sync_prepend_learner_memory, path, subject, chapter, query, user_id, top_k)
 
 
-def _generate_mcqs_from_query_direct(
+def _normalize_openrouter_mcqs_payload(
+    raw_mcqs: list,
+    *,
+    include_explanations: bool,
+    max_items: int,
+) -> List[dict]:
+    """Turn model JSON `mcqs` array into the internal dict shape used by `/generate-mcqs`."""
+    cap = max(1, min(20, int(max_items or 10)))
+    normalized: List[dict] = []
+    if not isinstance(raw_mcqs, list):
+        return []
+    for item in raw_mcqs:
+        if len(normalized) >= cap:
+            break
+        if not isinstance(item, dict):
+            continue
+        options = item.get("options", {})
+        if not isinstance(options, dict) or not all(k in options for k in ["a", "b", "c", "d"]):
+            continue
+        answer = str(item.get("correct_answer", "")).lower().strip()
+        if answer not in ["a", "b", "c", "d"]:
+            continue
+
+        explanation = {"correct": item.get("correct_explanation", "Correct option by standard method.")}
+        if include_explanations:
+            for key in ["a", "b", "c", "d"]:
+                explanation[key] = "Option analysis available in tutor mode."
+
+        normalized.append(
+            {
+                "question_number": len(normalized) + 1,
+                "concept_id": str(item.get("concept_id", f"query_concept_{len(normalized) + 1}")),
+                "stem": str(item.get("stem", f"Generated question {len(normalized) + 1}")),
+                "options": options,
+                "correct_answer": answer,
+                "explanation": explanation,
+                "metadata": {
+                    "difficulty": str(item.get("difficulty", "medium")),
+                    "validation_score": 1.0,
+                    "was_corrected": False,
+                    "integral_type": "query_generated",
+                },
+            }
+        )
+    return normalized
+
+
+def _openrouter_flashcards_single_call(
+    *,
     subject: str,
     chapter: str,
     query: str,
+    desired_count: int,
     model: str,
     include_explanations: bool,
     learner_context: str = "",
     difficulty_hint: str = "medium",
-):
+) -> List[dict]:
     """
-    Direct query-to-MCQ fallback when the full pipeline returns zero questions.
+    One OpenRouter-compatible ChatOpenAI completion → MCQ list (Hub / flash cards).
+    No LangGraph.
     """
+    n = max(1, min(20, int(desired_count)))
     llm = ChatOpenAI(
         model=model,
-        temperature=0.4,
+        temperature=0.35,
         openai_api_key=os.getenv("OPENAI_API_KEY"),
         openai_api_base=os.getenv("OPENAI_BASE_URL", "https://openrouter.ai/api/v1"),
     )
@@ -169,14 +220,14 @@ def _generate_mcqs_from_query_direct(
         "    }\n"
         "  ]\n"
         "}\n"
-        "Generate 8-10 MCQs. Ensure exactly 4 options and one valid correct_answer key."
+        f"Generate **exactly {n}** MCQs. Each must have exactly four options a–d and a valid correct_answer."
     )
 
     user_prompt = (
         f"Subject: {subject}\n"
         f"Chapter: {chapter}\n"
         f"User query/topic: {query}\n"
-        "Generate conceptual and calculation-based MCQs."
+        "Generate conceptual and calculation-based MCQs aligned with the chapter."
     )
     if (learner_context or "").strip():
         user_prompt += (
@@ -184,42 +235,45 @@ def _generate_mcqs_from_query_direct(
             f"\nTarget difficulty bias for NEW items: **{difficulty_hint}**."
         )
 
-    response = llm.invoke([
-        SystemMessage(content=system_prompt),
-        HumanMessage(content=user_prompt),
-    ])
+    response = llm.invoke(
+        [
+            SystemMessage(content=system_prompt),
+            HumanMessage(content=user_prompt),
+        ]
+    )
     data = _parse_json_response(response.content)
     raw_mcqs = data.get("mcqs", [])
+    if not isinstance(raw_mcqs, list):
+        return []
+    return _normalize_openrouter_mcqs_payload(
+        raw_mcqs,
+        include_explanations=include_explanations,
+        max_items=n,
+    )
 
-    normalized = []
-    for idx, item in enumerate(raw_mcqs, start=1):
-        options = item.get("options", {})
-        if not all(k in options for k in ["a", "b", "c", "d"]):
-            continue
-        answer = item.get("correct_answer", "").lower().strip()
-        if answer not in ["a", "b", "c", "d"]:
-            continue
 
-        explanation = {"correct": item.get("correct_explanation", "Correct option by standard method.")}
-        if include_explanations:
-            for key in ["a", "b", "c", "d"]:
-                explanation[key] = "Option analysis available in tutor mode."
-
-        normalized.append({
-            "question_number": idx,
-            "concept_id": item.get("concept_id", f"query_concept_{idx}"),
-            "stem": item.get("stem", f"Generated question {idx}"),
-            "options": options,
-            "correct_answer": answer,
-            "explanation": explanation,
-            "metadata": {
-                "difficulty": item.get("difficulty", "medium"),
-                "validation_score": 1.0,
-                "was_corrected": False,
-                "integral_type": "query_generated",
-            },
-        })
-    return normalized
+def _generate_mcqs_from_query_direct(
+    subject: str,
+    chapter: str,
+    query: str,
+    model: str,
+    include_explanations: bool,
+    learner_context: str = "",
+    difficulty_hint: str = "medium",
+):
+    """
+    Direct query-to-MCQ fallback when the full pipeline returns zero questions.
+    """
+    return _openrouter_flashcards_single_call(
+        subject=subject,
+        chapter=chapter,
+        query=query,
+        desired_count=10,
+        model=model,
+        include_explanations=include_explanations,
+        learner_context=learner_context,
+        difficulty_hint=difficulty_hint,
+    )
 
 def _generate_mock_mcqs(
     subject: str,
@@ -398,10 +452,12 @@ async def generate_mcqs(
         "learner_context": "",
         "weak_focus_markdown": "",
     }
-    
+    # Hub flash cards: query-only, no uploaded file (same as frontend generateMCQsFromQuery).
+    hub_query_mode = bool(file is None and query and query.strip())
+
     # Create temporary file to store uploaded content
     temp_file_path = None
-    
+
     try:
         # Save uploaded file OR synthesize temporary markdown from query
         if file:
@@ -417,7 +473,6 @@ async def generate_mcqs(
                 temp_file_path = temp_file.name
             input_type = "chapter"
 
-        hub_query_mode = bool(file is None and query and query.strip())
         # For Hub flashcard generation, retrieve a wider memory set and let
         # learner_memory apply similarity threshold filtering.
         rag_top_k = 20 if hub_query_mode else 8
@@ -430,7 +485,7 @@ async def generate_mcqs(
             top_k=rag_top_k,
         )
         mem_stats.update(_mem)
-        
+
         print(f"\n{'='*60}")
         print(f"API REQUEST - Session ID: {session_id}")
         print(f"{'='*60}")
@@ -438,99 +493,133 @@ async def generate_mcqs(
         print(f"Chapter: {effective_chapter}")
         print(f"Source: {file.filename if file else 'query'}")
         print(f"Input Type: {input_type}")
+        print(f"Hub query-only (skip LangGraph): {hub_query_mode}")
         print(f"LLM: {llm_provider} - {model}")
         print(f"Batch Size: {batch_size}")
         print(f"{'='*60}\n")
-        
-        # Initialize MCQ Generator with specified configuration
-        generator = MCQGenerator(
-            llm_provider=llm_provider,
-            model=model,
-            batch_size=batch_size
-        )
 
-        # Generate MCQs (synchronous - waits for completion)
-        # If provider fails (timeout, rate-limit, etc.), keep flowing to fallback cards.
-        mcqs = []
-        try:
-            mcqs = generator.generate_from_file(
-                input_path=temp_file_path,
-                input_type=input_type,
-                output_path=None,  # We'll handle export separately
-                include_explanations=include_explanations
-            )
-        except Exception as primary_error:
-            err_text = str(primary_error)
-            print("\n" + "="*60)
-            print("Primary provider request failed; attempting fallback provider")
-            print(f"Primary error: {err_text}")
-            print(f"Fallback LLM: {FALLBACK_LLM_PROVIDER} - {FALLBACK_MODEL}")
-            print(f"Fallback batch size: {FALLBACK_BATCH_SIZE}")
-            print("="*60 + "\n")
-
-            llm_provider = FALLBACK_LLM_PROVIDER
-            model = FALLBACK_MODEL
-            batch_size = FALLBACK_BATCH_SIZE
-
-            try:
-                fallback_generator = MCQGenerator(
-                    llm_provider=llm_provider,
-                    model=model,
-                    batch_size=batch_size
+        mcqs: List[dict] = []
+        if hub_query_mode:
+            # Single OpenRouter-style completion path (no MCQGenerator / LangGraph).
+            llm_provider = DEFAULT_LLM_PROVIDER
+            batch_size = 1
+            learner_prefix = learner_memory.compose_learner_prefix_for_generation(mem_stats).strip()[:12000]
+            difficulty_hint = mem_stats.get("difficulty_hint") or "medium"
+            last_err: Optional[Exception] = None
+            for attempt_model in (DEFAULT_MODEL, FALLBACK_MODEL):
+                try:
+                    mcqs = await asyncio.to_thread(
+                        _openrouter_flashcards_single_call,
+                        subject=effective_subject,
+                        chapter=effective_chapter,
+                        query=query.strip(),
+                        desired_count=desired_count,
+                        model=attempt_model,
+                        include_explanations=include_explanations,
+                        learner_context=learner_prefix,
+                        difficulty_hint=difficulty_hint,
+                    )
+                    if mcqs:
+                        model = attempt_model
+                        break
+                except Exception as ex:
+                    last_err = ex
+                    print(f"\n[Hub flashcards] OpenRouter call failed for model={attempt_model}: {ex}\n")
+            if not mcqs:
+                detail = (
+                    "Hub flashcard generation produced no valid MCQs from the model response."
+                    + (f" Last error: {last_err}" if last_err else "")
                 )
-                mcqs = fallback_generator.generate_from_file(
+                raise HTTPException(status_code=502, detail=detail)
+        else:
+            # Initialize MCQ Generator with specified configuration
+            generator = MCQGenerator(
+                llm_provider=llm_provider,
+                model=model,
+                batch_size=batch_size
+            )
+
+            # Generate MCQs (synchronous - waits for completion)
+            # If provider fails (timeout, rate-limit, etc.), keep flowing to fallback cards.
+            try:
+                mcqs = generator.generate_from_file(
                     input_path=temp_file_path,
                     input_type=input_type,
-                    output_path=None,
+                    output_path=None,  # We'll handle export separately
                     include_explanations=include_explanations
                 )
-            except Exception as fallback_error:
-                print(f"Fallback provider failed: {fallback_error}")
-                mcqs = []
+            except Exception as primary_error:
+                err_text = str(primary_error)
+                print("\n" + "="*60)
+                print("Primary provider request failed; attempting fallback provider")
+                print(f"Primary error: {err_text}")
+                print(f"Fallback LLM: {FALLBACK_LLM_PROVIDER} - {FALLBACK_MODEL}")
+                print(f"Fallback batch size: {FALLBACK_BATCH_SIZE}")
+                print("="*60 + "\n")
 
-        # Last-mile fallback: if pipeline produced no cards, generate directly from query.
-        if len(mcqs) == 0 and query and query.strip():
-            print("\n" + "="*60)
-            print("Pipeline returned 0 MCQs; using direct query-based generation fallback")
-            print("="*60 + "\n")
-            try:
-                mcqs = _generate_mcqs_from_query_direct(
+                llm_provider = FALLBACK_LLM_PROVIDER
+                model = FALLBACK_MODEL
+                batch_size = FALLBACK_BATCH_SIZE
+
+                try:
+                    fallback_generator = MCQGenerator(
+                        llm_provider=llm_provider,
+                        model=model,
+                        batch_size=batch_size
+                    )
+                    mcqs = fallback_generator.generate_from_file(
+                        input_path=temp_file_path,
+                        input_type=input_type,
+                        output_path=None,
+                        include_explanations=include_explanations
+                    )
+                except Exception as fallback_error:
+                    print(f"Fallback provider failed: {fallback_error}")
+                    mcqs = []
+
+            # Last-mile fallback: if pipeline produced no cards, generate directly from query.
+            if len(mcqs) == 0 and query and query.strip():
+                print("\n" + "="*60)
+                print("Pipeline returned 0 MCQs; using direct query-based generation fallback")
+                print("="*60 + "\n")
+                try:
+                    mcqs = _generate_mcqs_from_query_direct(
+                        subject=effective_subject,
+                        chapter=effective_chapter,
+                        query=query.strip(),
+                        model=FALLBACK_MODEL,
+                        include_explanations=include_explanations,
+                        learner_context=learner_memory.compose_learner_prefix_for_generation(mem_stats).strip()[:12000],
+                        difficulty_hint=mem_stats.get("difficulty_hint") or "medium",
+                    )
+                except Exception as direct_error:
+                    print(f"Direct generation fallback failed: {direct_error}")
+                    mcqs = []
+
+            # Hard guarantee fallback for UI testing (not used for Hub query-only mode):
+            # if still empty OR less than requested, pad using deterministic mock cards.
+            if len(mcqs) == 0:
+                print("\nUsing mock MCQ fallback (no model output available).")
+                mcqs = _generate_mock_mcqs(
                     subject=effective_subject,
                     chapter=effective_chapter,
-                    query=query.strip(),
-                    model=FALLBACK_MODEL,
+                    requested_count=desired_count,
                     include_explanations=include_explanations,
-                    learner_context=learner_memory.compose_learner_prefix_for_generation(mem_stats).strip()[:12000],
-                    difficulty_hint=mem_stats.get("difficulty_hint") or "medium",
                 )
-            except Exception as direct_error:
-                print(f"Direct generation fallback failed: {direct_error}")
-                mcqs = []
-
-        # Hard guarantee fallback for UI testing:
-        # if still empty OR less than requested, pad using deterministic mock cards.
-        if len(mcqs) == 0:
-            print("\nUsing mock MCQ fallback (no model output available).")
-            mcqs = _generate_mock_mcqs(
-                subject=effective_subject,
-                chapter=effective_chapter,
-                requested_count=desired_count,
-                include_explanations=include_explanations,
-            )
-        elif len(mcqs) < desired_count:
-            print(f"\nTop-up fallback: generated {len(mcqs)}, requested {desired_count}.")
-            extras = _generate_mock_mcqs(
-                subject=effective_subject,
-                chapter=effective_chapter,
-                requested_count=desired_count - len(mcqs),
-                include_explanations=include_explanations,
-            )
-            # Continue numbering and append mock extras
-            start_idx = len(mcqs) + 1
-            for i, extra in enumerate(extras, start=start_idx):
-                extra["question_number"] = i
-                extra["concept_id"] = f"mock_{i}"
-            mcqs.extend(extras)
+            elif len(mcqs) < desired_count:
+                print(f"\nTop-up fallback: generated {len(mcqs)}, requested {desired_count}.")
+                extras = _generate_mock_mcqs(
+                    subject=effective_subject,
+                    chapter=effective_chapter,
+                    requested_count=desired_count - len(mcqs),
+                    include_explanations=include_explanations,
+                )
+                # Continue numbering and append mock extras
+                start_idx = len(mcqs) + 1
+                for i, extra in enumerate(extras, start=start_idx):
+                    extra["question_number"] = i
+                    extra["concept_id"] = f"mock_{i}"
+                mcqs.extend(extras)
         
         # Deterministic grading payload for each option set
         for mcq in mcqs:
@@ -657,11 +746,20 @@ async def generate_mcqs(
             sub_topic_key=(mem_stats.get("sub_topic_key") or "") or None,
             weak_focus_markdown=(mem_stats.get("weak_focus_markdown") or "").strip() or None,
         )
-    
+
+    except HTTPException:
+        raise
     except Exception as e:
         # Safety net for provider paths that still raise "no questions" upstream.
         # We degrade to deterministic mock cards instead of failing the API call.
         err_text = str(e)
+        if hub_query_mode:
+            print(f"\n{'='*60}")
+            print(f"[ERR] Hub query-only generation failed!")
+            print(f"[ERR] Session ID: {session_id}")
+            print(f"[ERR] Error: {str(e)}")
+            print(f"{'='*60}\n")
+            raise HTTPException(status_code=500, detail=f"MCQ generation failed: {str(e)}")
         lowered = err_text.lower()
         if "produced no questions" in lowered or "mock fallback is disabled" in lowered:
             try:

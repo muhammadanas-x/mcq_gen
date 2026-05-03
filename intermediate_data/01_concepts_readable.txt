@@ -1,8 +1,8 @@
 ================================================================================
 CONTENT ANALYZER - EXTRACTED CONCEPTS
 ================================================================================
-Timestamp: 2026-05-03 01:06:20
-Input Source: C:\Users\midni\AppData\Local\Temp\tmp8tw0xxdm.md
+Timestamp: 2026-05-03 04:10:48
+Input Source: C:\Users\midni\AppData\Local\Temp\tmppffla3cg.md
 Input Type: chapter
 LLM Provider: openai
 Model: meta-llama/llama-3-8b-instruct
