@@ -195,10 +195,17 @@ class GenerateMCQResponse(BaseModel):
     markdown_content: str
     learner_memory_enabled: Optional[bool] = None
     memory_hits: Optional[int] = None
+    summary_hits: Optional[int] = None
     difficulty_hint_applied: Optional[str] = None
     topic_key: Optional[str] = None
     sub_topic_key: Optional[str] = None
     weak_focus_markdown: Optional[str] = None
+    personalization_applied: Optional[bool] = None
+    personalization_reason: Optional[str] = None
+    memory_retrieval_tier: Optional[str] = None
+    memory_lane_used: Optional[str] = None
+    rag_top_k: Optional[int] = None
+    rag_min_score: Optional[float] = None
 
 
 class MCQListResponse(BaseModel):
@@ -252,3 +259,6 @@ class FlashcardFeedbackResponse(BaseModel):
     total_graded: int = 0
     pinecone_upserted: bool = False
     duplicate_event: bool = False
+    memory_source: Optional[str] = None
+    summary_generated: bool = False
+    summary_length: int = 0

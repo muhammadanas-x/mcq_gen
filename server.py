@@ -60,6 +60,39 @@ FALLBACK_LLM_PROVIDER = os.getenv("FALLBACK_LLM_PROVIDER", "openai")
 FALLBACK_MODEL = os.getenv("FALLBACK_MODEL", "meta-llama/llama-3-8b-instruct")
 FALLBACK_BATCH_SIZE = int(os.getenv("FALLBACK_BATCH_SIZE", "3"))
 
+
+def _env_int(name: str, default: int, *, minimum: int = 1, maximum: int = 100) -> int:
+    raw = (os.getenv(name) or "").strip()
+    try:
+        value = int(raw) if raw else int(default)
+    except (TypeError, ValueError):
+        value = int(default)
+    return max(minimum, min(maximum, value))
+
+
+def _env_float(name: str, default: float, *, minimum: float = 0.0, maximum: float = 1.0) -> float:
+    raw = (os.getenv(name) or "").strip()
+    try:
+        value = float(raw) if raw else float(default)
+    except (TypeError, ValueError):
+        value = float(default)
+    return max(minimum, min(maximum, value))
+
+
+def _resolve_user_id(form_user_id: Optional[str], header_user_id: Optional[str]) -> tuple[Optional[str], str]:
+    header_val = (header_user_id or "").strip()
+    if header_val:
+        return header_val, "header"
+    form_val = (form_user_id or "").strip()
+    if form_val:
+        return form_val, "form"
+    return None, "none"
+
+
+DEFAULT_RAG_TOP_K = _env_int("RAG_TOP_K", 8, minimum=1, maximum=50)
+HUB_QUERY_RAG_TOP_K = _env_int("RAG_TOP_K_HUB_QUERY", 20, minimum=1, maximum=80)
+DEFAULT_RAG_MIN_SCORE = _env_float("RAG_MIN_SCORE", 0.1, minimum=0.0, maximum=1.0)
+
 def _requested_mcq_count(query: Optional[str], default_count: int = 10) -> int:
     """
     Infer desired MCQ count from user query text.
@@ -84,6 +117,89 @@ def _parse_json_response(text: str):
             text = match.group(1)
     return json.loads(text, strict=False)
 
+
+def _summarize_weak_concepts_for_memory(
+    *,
+    subject: str,
+    chapter: str,
+    generation_query: str,
+    weak_concepts: List[str],
+    correct: int,
+    wrong: int,
+    graded: int,
+    last_score: float,
+    model: str,
+) -> dict:
+    weak_lines = [w.strip() for w in weak_concepts if str(w).strip()]
+    if not weak_lines:
+        return {
+            "summary": f"Learner currently shows mastery in {subject} / {chapter}. Keep medium-hard mixed practice.",
+            "focus_areas": ["Sustain mastery with mixed concept reinforcement."],
+            "common_mistakes": [],
+            "next_mcq_guidance": ["Use slight variation and increase challenge gradually."],
+        }
+
+    llm = ChatOpenAI(
+        model=model,
+        temperature=0.2,
+        openai_api_key=os.getenv("OPENAI_API_KEY"),
+        openai_api_base=os.getenv("OPENAI_BASE_URL", "https://openrouter.ai/api/v1"),
+    )
+
+    system_prompt = (
+        "You are a learning-analytics summarizer for math MCQ practice.\n"
+        "Return ONLY valid JSON with this shape:\n"
+        "{\n"
+        '  "summary": "single concise paragraph",\n'
+        '  "focus_areas": ["...", "..."],\n'
+        '  "common_mistakes": ["...", "..."],\n'
+        '  "next_mcq_guidance": ["...", "..."]\n'
+        "}\n"
+        "Rules:\n"
+        "- summary: 1 short paragraph, max 80 words\n"
+        "- focus_areas: 3-6 concise items\n"
+        "- common_mistakes: 2-5 concise items\n"
+        "- next_mcq_guidance: 2-4 actionable generation directives\n"
+        "- Keep statements specific and pedagogically useful."
+    )
+    weak_blob = "\n".join(f"- {w}" for w in weak_lines[:20])
+    user_prompt = (
+        f"Subject: {subject}\n"
+        f"Chapter: {chapter}\n"
+        f"Generation query: {generation_query or 'n/a'}\n"
+        f"Score stats: correct={correct}, wrong={wrong}, graded={graded}, score_percent={last_score}\n\n"
+        "Weak concept observations:\n"
+        f"{weak_blob}\n\n"
+        "Generate the JSON now."
+    )
+
+    response = llm.invoke(
+        [
+            SystemMessage(content=system_prompt),
+            HumanMessage(content=user_prompt),
+        ]
+    )
+    data = _parse_json_response(response.content)
+    summary = " ".join(str(data.get("summary", "")).split()).strip()
+    focus_areas = [str(x).strip() for x in (data.get("focus_areas") or []) if str(x).strip()]
+    common_mistakes = [str(x).strip() for x in (data.get("common_mistakes") or []) if str(x).strip()]
+    next_mcq_guidance = [str(x).strip() for x in (data.get("next_mcq_guidance") or []) if str(x).strip()]
+
+    if not summary:
+        summary = "Learner weak areas detected; prioritize conceptual remediation and step-by-step reasoning checks."
+    if not focus_areas:
+        focus_areas = ["Reinforce weak concepts from recent incorrect attempts."]
+    if not next_mcq_guidance:
+        next_mcq_guidance = ["Generate novel remedial items targeting the weakest ideas first."]
+
+    return {
+        "summary": summary[:1200],
+        "focus_areas": focus_areas[:8],
+        "common_mistakes": common_mistakes[:8],
+        "next_mcq_guidance": next_mcq_guidance[:8],
+    }
+
+
 def _sync_prepend_learner_memory(
     path: str,
     subject: str,
@@ -91,11 +207,19 @@ def _sync_prepend_learner_memory(
     query: Optional[str],
     user_id: str,
     top_k: int = 8,
+    min_score: float = DEFAULT_RAG_MIN_SCORE,
 ) -> dict:
     """Runs in thread: query Pinecone and prepend weak-focus + memory block to chapter markdown."""
     td, sd, tk, sk = learner_memory.topic_subtopic_from_strings(subject, chapter)
     qt = (query or "").strip() or f"{td} {sd}"
-    bundle = learner_memory.query_memory_bundle(user_id, tk, sk, qt, top_k=top_k)
+    bundle = learner_memory.query_memory_bundle(
+        user_id,
+        tk,
+        sk,
+        qt,
+        top_k=top_k,
+        min_score=min_score,
+    )
     composed = learner_memory.compose_learner_prefix_for_generation(bundle)
     with open(path, "r", encoding="utf-8") as f:
         content = f.read()
@@ -106,11 +230,15 @@ def _sync_prepend_learner_memory(
             f.write(composed.strip() + "\n\n" + content)
     return {
         "memory_hits": bundle["memory_hits"],
+        "summary_hits": bundle.get("summary_hits") or 0,
         "difficulty_hint": bundle["difficulty_hint"],
         "topic_key": tk,
         "sub_topic_key": sk,
         "learner_context": bundle.get("learner_context") or "",
         "weak_focus_markdown": bundle.get("weak_focus_markdown") or "",
+        "lane_used": bundle.get("lane_used") or "",
+        "retrieval_tier": bundle.get("retrieval_tier") or "none",
+        "retrieval_trace": bundle.get("retrieval_trace") or [],
     }
 
 
@@ -121,18 +249,32 @@ async def _prepend_learner_memory_file(
     query: Optional[str],
     user_id: Optional[str],
     top_k: int = 8,
+    min_score: float = DEFAULT_RAG_MIN_SCORE,
 ) -> dict:
     if not path or not user_id or not learner_memory.is_configured():
         td, sd, tk, sk = learner_memory.topic_subtopic_from_strings(subject, chapter)
         return {
             "memory_hits": 0,
+            "summary_hits": 0,
             "difficulty_hint": "medium",
             "topic_key": tk,
             "sub_topic_key": sk,
             "learner_context": "",
             "weak_focus_markdown": "",
+            "lane_used": "",
+            "retrieval_tier": "none",
+            "retrieval_trace": [],
         }
-    return await asyncio.to_thread(_sync_prepend_learner_memory, path, subject, chapter, query, user_id, top_k)
+    return await asyncio.to_thread(
+        _sync_prepend_learner_memory,
+        path,
+        subject,
+        chapter,
+        query,
+        user_id,
+        top_k,
+        min_score,
+    )
 
 
 def _normalize_openrouter_mcqs_payload(
@@ -221,6 +363,7 @@ def _openrouter_flashcards_single_call(
         "  ]\n"
         "}\n"
         f"Generate **exactly {n}** MCQs. Each must have exactly four options a–d and a valid correct_answer."
+        " If learner summary context is provided, prioritize those focus areas and mistakes while keeping stems novel."
     )
 
     user_prompt = (
@@ -231,7 +374,9 @@ def _openrouter_flashcards_single_call(
     )
     if (learner_context or "").strip():
         user_prompt += (
-            f"\n\nPrior learner activity (do not repeat verbatim stems):\n{learner_context[:4000]}\n"
+            f"\n\nPrior learner activity and summary context (do not repeat verbatim stems):\n{learner_context[:4000]}\n"
+            "\nInstruction: Use retrieved focus_areas/common_mistakes/next_mcq_guidance to generate "
+            "remedial questions that target misconceptions directly while varying wording and numbers."
             f"\nTarget difficulty bias for NEW items: **{difficulty_hint}**."
         )
 
@@ -258,6 +403,7 @@ def _generate_mcqs_from_query_direct(
     query: str,
     model: str,
     include_explanations: bool,
+    desired_count: int = 10,
     learner_context: str = "",
     difficulty_hint: str = "medium",
 ):
@@ -268,7 +414,7 @@ def _generate_mcqs_from_query_direct(
         subject=subject,
         chapter=chapter,
         query=query,
-        desired_count=10,
+        desired_count=desired_count,
         model=model,
         include_explanations=include_explanations,
         learner_context=learner_context,
@@ -442,15 +588,19 @@ async def generate_mcqs(
     
     # Generate unique session ID
     session_id = str(uuid.uuid4())
-    resolved_user_id = (user_id or x_user_id or "").strip() or None
+    resolved_user_id, identity_source = _resolve_user_id(user_id, x_user_id)
     desired_count = _requested_mcq_count(query, default_count=10)
     mem_stats: dict = {
         "memory_hits": 0,
+        "summary_hits": 0,
         "difficulty_hint": "medium",
         "topic_key": "",
         "sub_topic_key": "",
         "learner_context": "",
         "weak_focus_markdown": "",
+        "lane_used": "",
+        "retrieval_tier": "none",
+        "retrieval_trace": [],
     }
     # Hub flash cards: query-only, no uploaded file (same as frontend generateMCQsFromQuery).
     hub_query_mode = bool(file is None and query and query.strip())
@@ -475,7 +625,8 @@ async def generate_mcqs(
 
         # For Hub flashcard generation, retrieve a wider memory set and let
         # learner_memory apply similarity threshold filtering.
-        rag_top_k = 20 if hub_query_mode else 8
+        rag_top_k = HUB_QUERY_RAG_TOP_K if hub_query_mode else DEFAULT_RAG_TOP_K
+        rag_min_score = DEFAULT_RAG_MIN_SCORE
         _mem = await _prepend_learner_memory_file(
             temp_file_path,
             effective_subject,
@@ -483,6 +634,7 @@ async def generate_mcqs(
             query,
             resolved_user_id,
             top_k=rag_top_k,
+            min_score=rag_min_score,
         )
         mem_stats.update(_mem)
 
@@ -494,6 +646,11 @@ async def generate_mcqs(
         print(f"Source: {file.filename if file else 'query'}")
         print(f"Input Type: {input_type}")
         print(f"Hub query-only (skip LangGraph): {hub_query_mode}")
+        print(f"Identity source: {identity_source}")
+        print(f"Resolved user_id: {resolved_user_id or '[none]'}")
+        print(f"RAG top_k: {rag_top_k} | min_score: {rag_min_score}")
+        print(f"RAG retrieval tier: {mem_stats.get('retrieval_tier') or 'none'}")
+        print(f"RAG memory hits: {int(mem_stats.get('memory_hits') or 0)}")
         print(f"LLM: {llm_provider} - {model}")
         print(f"Batch Size: {batch_size}")
         print(f"{'='*60}\n")
@@ -589,6 +746,7 @@ async def generate_mcqs(
                         query=query.strip(),
                         model=FALLBACK_MODEL,
                         include_explanations=include_explanations,
+                        desired_count=desired_count,
                         learner_context=learner_memory.compose_learner_prefix_for_generation(mem_stats).strip()[:12000],
                         difficulty_hint=mem_stats.get("difficulty_hint") or "medium",
                     )
@@ -723,6 +881,23 @@ async def generate_mcqs(
             await db[COLLECTIONS["mcqs"]].insert_many(mcq_docs, ordered=True)
 
         memory_enabled = bool(resolved_user_id and learner_memory.is_configured())
+        memory_hits = int(mem_stats.get("memory_hits") or 0)
+        summary_hits = int(mem_stats.get("summary_hits") or 0)
+        personalization_applied = bool(
+            memory_enabled and (
+                memory_hits > 0
+                or (mem_stats.get("learner_context") or "").strip()
+                or (mem_stats.get("weak_focus_markdown") or "").strip()
+            )
+        )
+        if not resolved_user_id:
+            personalization_reason = "missing_user_id"
+        elif not learner_memory.is_configured():
+            personalization_reason = "learner_memory_not_configured"
+        elif personalization_applied:
+            personalization_reason = "rag_context_applied"
+        else:
+            personalization_reason = "no_rag_hits"
 
         print(f"\n{'='*60}")
         print(f"[OK] Generation completed successfully!")
@@ -740,11 +915,18 @@ async def generate_mcqs(
             mcqs=mcq_responses,
             markdown_content=markdown_content,
             learner_memory_enabled=memory_enabled,
-            memory_hits=int(mem_stats.get("memory_hits") or 0),
+            memory_hits=memory_hits,
+            summary_hits=summary_hits,
             difficulty_hint_applied=str(mem_stats.get("difficulty_hint") or "medium"),
             topic_key=(mem_stats.get("topic_key") or "") or None,
             sub_topic_key=(mem_stats.get("sub_topic_key") or "") or None,
             weak_focus_markdown=(mem_stats.get("weak_focus_markdown") or "").strip() or None,
+            personalization_applied=personalization_applied,
+            personalization_reason=personalization_reason,
+            memory_retrieval_tier=(mem_stats.get("retrieval_tier") or "") or None,
+            memory_lane_used=(mem_stats.get("lane_used") or "") or None,
+            rag_top_k=rag_top_k,
+            rag_min_score=rag_min_score,
         )
 
     except HTTPException:
@@ -865,6 +1047,23 @@ async def generate_mcqs(
                     await db[COLLECTIONS["mcqs"]].insert_many(mcq_docs, ordered=True)
 
                 memory_enabled = bool(resolved_user_id and learner_memory.is_configured())
+                memory_hits = int(mem_stats.get("memory_hits") or 0)
+                summary_hits = int(mem_stats.get("summary_hits") or 0)
+                personalization_applied = bool(
+                    memory_enabled and (
+                        memory_hits > 0
+                        or (mem_stats.get("learner_context") or "").strip()
+                        or (mem_stats.get("weak_focus_markdown") or "").strip()
+                    )
+                )
+                if not resolved_user_id:
+                    personalization_reason = "missing_user_id"
+                elif not learner_memory.is_configured():
+                    personalization_reason = "learner_memory_not_configured"
+                elif personalization_applied:
+                    personalization_reason = "rag_context_applied"
+                else:
+                    personalization_reason = "no_rag_hits"
                 return GenerateMCQResponse(
                     session_id=session_id,
                     message="MCQs generated using mock fallback (provider returned no questions)",
@@ -874,11 +1073,18 @@ async def generate_mcqs(
                     mcqs=mcq_responses,
                     markdown_content=markdown_content,
                     learner_memory_enabled=memory_enabled,
-                    memory_hits=int(mem_stats.get("memory_hits") or 0),
+                    memory_hits=memory_hits,
+                    summary_hits=summary_hits,
                     difficulty_hint_applied=str(mem_stats.get("difficulty_hint") or "medium"),
                     topic_key=(mem_stats.get("topic_key") or "") or None,
                     sub_topic_key=(mem_stats.get("sub_topic_key") or "") or None,
                     weak_focus_markdown=(mem_stats.get("weak_focus_markdown") or "").strip() or None,
+                    personalization_applied=personalization_applied,
+                    personalization_reason=personalization_reason,
+                    memory_retrieval_tier=(mem_stats.get("retrieval_tier") or "") or None,
+                    memory_lane_used=(mem_stats.get("lane_used") or "") or None,
+                    rag_top_k=rag_top_k,
+                    rag_min_score=rag_min_score,
                 )
             except Exception as fallback_error:
                 print(f"[ERR] Emergency mock fallback failed: {fallback_error}")
@@ -906,7 +1112,7 @@ async def flashcard_feedback(
     Record flashcard practice outcomes and upsert a Pinecone vector with weak_concepts
     for later RAG during MCQ generation.
     """
-    uid = (payload.user_id or x_user_id or "").strip()
+    uid, _identity_source = _resolve_user_id(payload.user_id, x_user_id)
     if not uid:
         raise HTTPException(status_code=400, detail="user_id is required (form field or X-User-Id header)")
 
@@ -989,31 +1195,85 @@ async def flashcard_feedback(
             )
 
     pinecone_ok = False
-    if learner_memory.is_configured() and weak:
-        excerpt_mem = weak[0][:800]
+    memory_source = "disabled"
+    summary_generated = False
+    summary_length = 0
+    weak_summary = ""
+    focus_areas: List[str] = []
+    common_mistakes: List[str] = []
+    next_mcq_guidance: List[str] = []
+    if learner_memory.is_configured():
+        weak_excerpt = weak[0][:800] if weak else ""
+        mastery_excerpt = (
+            f"Session mastery summary: score={last_score}%, correct={correct}, "
+            f"wrong={wrong}, graded={graded}"
+        )
+        try:
+            summary_payload = await asyncio.to_thread(
+                _summarize_weak_concepts_for_memory,
+                subject=str(sess.get("subject") or ""),
+                chapter=str(sess.get("chapter") or ""),
+                generation_query=(sess.get("generation_query") or "").strip(),
+                weak_concepts=weak,
+                correct=correct,
+                wrong=wrong,
+                graded=graded,
+                last_score=last_score,
+                model=DEFAULT_MODEL,
+            )
+            weak_summary = str(summary_payload.get("summary") or "").strip()
+            focus_areas = [str(x).strip() for x in (summary_payload.get("focus_areas") or []) if str(x).strip()]
+            common_mistakes = [
+                str(x).strip() for x in (summary_payload.get("common_mistakes") or []) if str(x).strip()
+            ]
+            next_mcq_guidance = [
+                str(x).strip() for x in (summary_payload.get("next_mcq_guidance") or []) if str(x).strip()
+            ]
+            summary_generated = bool(weak_summary)
+            summary_length = len(weak_summary)
+        except Exception as summary_err:
+            weak_summary = weak_excerpt or mastery_excerpt
+            focus_areas = weak[:5]
+            common_mistakes = weak[:5]
+            next_mcq_guidance = ["Prioritize remediation for repeatedly missed sub-skills first."]
+            summary_generated = False
+            summary_length = len(weak_summary)
+            print(f"[flashcard_feedback] summary generation failed: {summary_err}")
+        excerpt_mem = weak_excerpt or mastery_excerpt
         prompt_mem = (sess.get("generation_query") or "").strip() or "flashcard_practice"
+        source = "mcq_flashcard_practice_weak" if weak else "mcq_flashcard_practice_mastery"
         vid = await asyncio.to_thread(
             learner_memory.upsert_memory_record,
             user_id=uid,
             topic=str(sess.get("subject") or ""),
             sub_topic=str(sess.get("chapter") or ""),
             prompt=prompt_mem,
-            source="mcq_flashcard_practice",
+            source=source,
             session_id=payload.session_id,
             excerpt=excerpt_mem,
-            weak_concepts=weak,
+            weak_concepts=weak or [mastery_excerpt],
+            weak_summary=weak_summary,
+            focus_areas=focus_areas,
+            common_mistakes=common_mistakes,
+            next_mcq_guidance=next_mcq_guidance,
             last_score=last_score,
             wrong_count=wrong,
             total_attempted=graded,
         )
         pinecone_ok = bool(vid)
-        if pinecone_ok and cid:
-            try:
-                await db[COLLECTIONS["flashcard_feedback_dedup"]].insert_one(
-                    {"user_id": uid, "client_event_id": cid, "created_at": datetime.utcnow()}
-                )
-            except DuplicateKeyError:
-                pass
+        memory_source = source
+    elif weak:
+        memory_source = "learner_memory_not_configured"
+    else:
+        memory_source = "mastery_not_persisted_memory_disabled"
+
+    if cid:
+        try:
+            await db[COLLECTIONS["flashcard_feedback_dedup"]].insert_one(
+                {"user_id": uid, "client_event_id": cid, "created_at": datetime.utcnow()}
+            )
+        except DuplicateKeyError:
+            pass
 
     return FlashcardFeedbackResponse(
         message="Flashcard feedback recorded",
@@ -1023,6 +1283,9 @@ async def flashcard_feedback(
         total_graded=graded,
         pinecone_upserted=pinecone_ok,
         duplicate_event=False,
+        memory_source=memory_source,
+        summary_generated=summary_generated,
+        summary_length=summary_length,
     )
 
 
