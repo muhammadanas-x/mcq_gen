@@ -13,7 +13,7 @@ import re
 import random
 import asyncio
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from fastapi import FastAPI, File, UploadFile, Form, HTTPException, Query, Header
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -27,8 +27,15 @@ from models import (
     GenerateMCQResponse, MCQResponse, SessionResponse,
     MCQListResponse, SessionListResponse, HealthResponse,
     FlashcardFeedbackRequest, FlashcardFeedbackResponse,
+    ChatSessionUpsert, ChatSessionResponse, ChatSessionListResponse, ChatSessionRename,
+    AssignmentSave, AssignmentResponse, AssignmentListResponse,
+    DashboardSummaryResponse, DashboardTotals, DashboardSlice, DashboardWeakTopic, DashboardRecentTopic,
+    VideoSave, VideoResponse, VideoListResponse, VideoScene,
+    CommunityPostCreate, CommunityPostResponse, CommunityPostListResponse,
+    CommunityLikeRequest, CommunityCommentCreate, CommunityComment,
 )
 from pymongo.errors import DuplicateKeyError
+from pymongo import ReturnDocument
 from answer_grading import build_answer_grading
 from nodes.assembler import export_mcqs_to_markdown
 import learner_memory
@@ -116,6 +123,71 @@ def _parse_json_response(text: str):
         if match:
             text = match.group(1)
     return json.loads(text, strict=False)
+
+
+def _safe_topic_label(topic: Optional[str], sub_topic: Optional[str], chapter: Optional[str]) -> str:
+    t = (topic or "").strip()
+    st = (sub_topic or "").strip()
+    ch = (chapter or "").strip()
+    if t and st:
+        return f"{t} / {st}"
+    if t:
+        return t
+    if ch:
+        return ch
+    return "General"
+
+
+def _build_dashboard_weak_topics(
+    sessions: List[Dict[str, Any]],
+    mcq_topic_counts: Dict[str, int],
+) -> List[DashboardWeakTopic]:
+    aggregate: Dict[str, Dict[str, float]] = {}
+
+    for session in sessions:
+        topic_label = _safe_topic_label(
+            session.get("topic"),
+            session.get("sub_topic"),
+            session.get("chapter"),
+        )
+        summary = session.get("first_attempt_summary") or {}
+        attempts = int(summary.get("total_questions") or 0)
+        wrong = int(summary.get("total_wrong") or 0)
+        hard_bias = float((session.get("difficulty_distribution") or {}).get("hard") or 0)
+        hard_ratio = (hard_bias / attempts) if attempts else 0.0
+        wrong_ratio = (wrong / attempts) if attempts else 0.0
+        severity = (wrong_ratio * 0.75) + (hard_ratio * 0.25)
+
+        if topic_label not in aggregate:
+            aggregate[topic_label] = {
+                "score": 0.0,
+                "attempts": 0.0,
+                "wrong_answers": 0.0,
+            }
+
+        aggregate[topic_label]["score"] += severity * max(attempts, 1)
+        aggregate[topic_label]["attempts"] += attempts
+        aggregate[topic_label]["wrong_answers"] += wrong
+
+    weak_topics: List[DashboardWeakTopic] = []
+    for topic_label, vals in aggregate.items():
+        attempts = int(vals["attempts"])
+        if attempts <= 0 and mcq_topic_counts.get(topic_label, 0) <= 0:
+            continue
+        weighted = vals["score"] / max(attempts, 1)
+        # Small frequency prior so repeatedly seen topics surface.
+        weighted += min(0.15, mcq_topic_counts.get(topic_label, 0) * 0.01)
+        weak_topics.append(
+            DashboardWeakTopic(
+                topic=topic_label,
+                score=round(weighted, 3),
+                attempts=attempts,
+                wrong_answers=int(vals["wrong_answers"]),
+            )
+        )
+
+    weak_topics.sort(key=lambda x: (x.score, x.wrong_answers, x.attempts), reverse=True)
+    return weak_topics[:8]
 
 
 def _summarize_weak_concepts_for_memory(
@@ -843,6 +915,8 @@ async def generate_mcqs(
 
         mcq_docs = []
         mcq_responses = []
+        _topic_val = (topic or "").strip() or None
+        _sub_topic_val = (sub_topic or "").strip() or None
         for i, mcq in enumerate(mcqs, start=1):
             api_mcq_id = f"{session_id}_{i}"
             mcq_docs.append({
@@ -851,6 +925,8 @@ async def generate_mcqs(
                 "user_id": resolved_user_id,
                 "subject": effective_subject,
                 "chapter": effective_chapter,
+                "topic": _topic_val,
+                "sub_topic": _sub_topic_val,
                 "generation_query": generation_query,
                 "question_number": mcq.get("question_number", i),
                 "concept_id": mcq.get("concept_id", f"concept_{i}"),
@@ -865,8 +941,11 @@ async def generate_mcqs(
             mcq_responses.append(MCQResponse(
                 id=api_mcq_id,
                 session_id=session_id,
+                user_id=resolved_user_id,
                 subject=effective_subject,
                 chapter=effective_chapter,
+                topic=_topic_val,
+                sub_topic=_sub_topic_val,
                 question_number=mcq.get("question_number", i),
                 concept_id=mcq.get("concept_id", f"concept_{i}"),
                 stem=mcq["stem"],
@@ -1017,6 +1096,8 @@ async def generate_mcqs(
                         "user_id": resolved_user_id,
                         "subject": effective_subject,
                         "chapter": effective_chapter,
+                        "topic": _topic_val,
+                        "sub_topic": _sub_topic_val,
                         "generation_query": generation_query,
                         "question_number": mcq.get("question_number", i),
                         "concept_id": mcq.get("concept_id", f"concept_{i}"),
@@ -1031,8 +1112,11 @@ async def generate_mcqs(
                     mcq_responses.append(MCQResponse(
                         id=api_mcq_id,
                         session_id=session_id,
+                        user_id=resolved_user_id,
                         subject=effective_subject,
                         chapter=effective_chapter,
+                        topic=_topic_val,
+                        sub_topic=_sub_topic_val,
                         question_number=mcq.get("question_number", i),
                         concept_id=mcq.get("concept_id", f"concept_{i}"),
                         stem=mcq["stem"],
@@ -1386,48 +1470,55 @@ async def get_session(session_id: str):
 
 @app.get("/mcqs", response_model=MCQListResponse, tags=["MCQs"])
 async def list_mcqs(
+    user_id: Optional[str] = Query(None, description="Filter by user ID"),
     subject: Optional[str] = Query(None, description="Filter by subject"),
     chapter: Optional[str] = Query(None, description="Filter by chapter"),
+    topic: Optional[str] = Query(None, description="Filter by topic"),
+    sub_topic: Optional[str] = Query(None, description="Filter by sub-topic"),
     session_id: Optional[str] = Query(None, description="Filter by session ID"),
     difficulty: Optional[str] = Query(None, description="Filter by difficulty (easy, medium, hard)"),
     skip: int = Query(0, ge=0, description="Number of MCQs to skip"),
     limit: int = Query(10, ge=1, le=100, description="Maximum MCQs to return")
 ):
     """
-    List all generated MCQs.
-    
-    Optionally filter by subject, chapter, session ID, and/or difficulty.
+    List generated MCQs with optional filters including user_id, subject, chapter, topic, sub_topic.
     """
     db = await get_async_database()
-    
-    # Build query filter
+
     query_filter = {}
+    if user_id:
+        query_filter["user_id"] = user_id
     if subject:
         query_filter["subject"] = subject
     if chapter:
         query_filter["chapter"] = chapter
+    if topic:
+        query_filter["topic"] = topic
+    if sub_topic:
+        query_filter["sub_topic"] = sub_topic
     if session_id:
         query_filter["session_id"] = session_id
     if difficulty:
         query_filter["metadata.difficulty"] = difficulty
-    
-    # Get total count
+
     total = await db[COLLECTIONS["mcqs"]].count_documents(query_filter)
-    
-    # Fetch MCQs
+
     mcqs = await db[COLLECTIONS["mcqs"]].find(query_filter)\
-        .sort("question_number", 1)\
+        .sort([("created_at", -1), ("question_number", 1)])\
         .skip(skip)\
         .limit(limit)\
         .to_list(length=limit)
-    
+
     mcq_responses = []
     for mcq in mcqs:
         mcq_responses.append(MCQResponse(
-            id=str(mcq["_id"]),
+            id=str(mcq.get("api_mcq_id") or str(mcq["_id"])),
             session_id=mcq["session_id"],
+            user_id=mcq.get("user_id"),
             subject=mcq["subject"],
             chapter=mcq["chapter"],
+            topic=mcq.get("topic"),
+            sub_topic=mcq.get("sub_topic"),
             question_number=mcq["question_number"],
             concept_id=mcq["concept_id"],
             stem=mcq["stem"],
@@ -1438,7 +1529,7 @@ async def list_mcqs(
             metadata=mcq["metadata"],
             created_at=mcq["created_at"]
         ))
-    
+
     return MCQListResponse(
         total=total,
         mcqs=mcq_responses
@@ -1495,10 +1586,13 @@ async def get_mcq(mcq_id: str):
         raise HTTPException(status_code=404, detail="MCQ not found")
     
     return MCQResponse(
-        id=str(mcq["_id"]),
+        id=str(mcq.get("api_mcq_id") or str(mcq["_id"])),
         session_id=mcq["session_id"],
+        user_id=mcq.get("user_id"),
         subject=mcq["subject"],
         chapter=mcq["chapter"],
+        topic=mcq.get("topic"),
+        sub_topic=mcq.get("sub_topic"),
         question_number=mcq["question_number"],
         concept_id=mcq["concept_id"],
         stem=mcq["stem"],
@@ -1509,6 +1603,648 @@ async def get_mcq(mcq_id: str):
         metadata=mcq["metadata"],
         created_at=mcq["created_at"]
     )
+
+
+# ============================================================================
+# Chat Session Endpoints
+# ============================================================================
+
+@app.post("/chat-sessions", response_model=ChatSessionResponse, tags=["Chat Sessions"])
+async def upsert_chat_session(body: ChatSessionUpsert):
+    """Create or update a chat session for a user (upsert by session_id)."""
+    db = await get_async_database()
+    now = datetime.utcnow()
+    col = db[COLLECTIONS["chat_sessions"]]
+
+    doc = {
+        "session_id": body.session_id,
+        "user_id": body.user_id,
+        "title": body.title,
+        "messages": body.messages,
+        "updated_at": now,
+    }
+    result = await col.find_one_and_update(
+        {"session_id": body.session_id, "user_id": body.user_id},
+        {"$set": {k: v for k, v in doc.items() if k != "session_id"},
+         "$setOnInsert": {"created_at": now}},
+        upsert=True,
+        return_document=ReturnDocument.AFTER,
+    )
+    if result is None:
+        result = await col.find_one({"session_id": body.session_id, "user_id": body.user_id})
+
+    return ChatSessionResponse(
+        session_id=result["session_id"],
+        user_id=result["user_id"],
+        title=result["title"],
+        messages=result.get("messages", []),
+        created_at=result.get("created_at", now),
+        updated_at=result.get("updated_at", now),
+    )
+
+
+@app.get("/chat-sessions", response_model=ChatSessionListResponse, tags=["Chat Sessions"])
+async def list_chat_sessions(
+    user_id: str = Query(..., description="User ID to fetch sessions for"),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
+):
+    """List all chat sessions for a user, newest first."""
+    db = await get_async_database()
+    col = db[COLLECTIONS["chat_sessions"]]
+    total = await col.count_documents({"user_id": user_id})
+    docs = await col.find({"user_id": user_id})\
+        .sort("updated_at", -1)\
+        .skip(skip).limit(limit).to_list(length=limit)
+
+    sessions = [
+        ChatSessionResponse(
+            session_id=d["session_id"],
+            user_id=d["user_id"],
+            title=d.get("title", "Chat"),
+            messages=d.get("messages", []),
+            created_at=d.get("created_at", d.get("updated_at", datetime.utcnow())),
+            updated_at=d.get("updated_at", datetime.utcnow()),
+        )
+        for d in docs
+    ]
+    return ChatSessionListResponse(total=total, sessions=sessions)
+
+
+@app.get("/chat-sessions/{session_id}", response_model=ChatSessionResponse, tags=["Chat Sessions"])
+async def get_chat_session(session_id: str, user_id: str = Query(...)):
+    """Get a single chat session by session_id (must belong to requesting user)."""
+    db = await get_async_database()
+    doc = await db[COLLECTIONS["chat_sessions"]].find_one(
+        {"session_id": session_id, "user_id": user_id}
+    )
+    if not doc:
+        raise HTTPException(status_code=404, detail="Chat session not found")
+    now = datetime.utcnow()
+    return ChatSessionResponse(
+        session_id=doc["session_id"],
+        user_id=doc["user_id"],
+        title=doc.get("title", "Chat"),
+        messages=doc.get("messages", []),
+        created_at=doc.get("created_at", now),
+        updated_at=doc.get("updated_at", now),
+    )
+
+
+@app.patch("/chat-sessions/{session_id}", response_model=ChatSessionResponse, tags=["Chat Sessions"])
+async def rename_chat_session(session_id: str, body: ChatSessionRename):
+    """Rename an existing chat session title for a user."""
+    db = await get_async_database()
+    now = datetime.utcnow()
+    col = db[COLLECTIONS["chat_sessions"]]
+    title = (body.title or "").strip()
+    if not title:
+        raise HTTPException(status_code=400, detail="title is required")
+
+    updated = await col.find_one_and_update(
+        {"session_id": session_id, "user_id": body.user_id},
+        {"$set": {"title": title[:120], "updated_at": now}},
+        return_document=ReturnDocument.AFTER,
+    )
+    if not updated:
+        raise HTTPException(status_code=404, detail="Chat session not found")
+
+    return ChatSessionResponse(
+        session_id=updated["session_id"],
+        user_id=updated["user_id"],
+        title=updated.get("title", "Chat"),
+        messages=updated.get("messages", []),
+        created_at=updated.get("created_at", now),
+        updated_at=updated.get("updated_at", now),
+    )
+
+
+@app.delete("/chat-sessions/{session_id}", tags=["Chat Sessions"])
+async def delete_chat_session(session_id: str, user_id: str = Query(...)):
+    """Delete a chat session for a user."""
+    db = await get_async_database()
+    col = db[COLLECTIONS["chat_sessions"]]
+    result = await col.delete_one({"session_id": session_id, "user_id": user_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Chat session not found")
+    return {"ok": True, "deleted": session_id}
+
+
+# ============================================================================
+# Assignment Endpoints
+# ============================================================================
+
+@app.post("/assignments", response_model=AssignmentResponse, tags=["Assignments"])
+async def save_assignment(body: AssignmentSave):
+    """Save assignment text content for a user."""
+    db = await get_async_database()
+    now = datetime.utcnow()
+    assignment_id = str(uuid.uuid4())
+    doc = {
+        "assignment_id": assignment_id,
+        "user_id": body.user_id,
+        "query": body.query,
+        "title": body.title,
+        "content": body.content,
+        "subject": body.subject,
+        "created_at": now,
+    }
+    await db[COLLECTIONS["user_assignments"]].insert_one(doc)
+    return AssignmentResponse(
+        assignment_id=assignment_id,
+        user_id=body.user_id,
+        query=body.query,
+        title=body.title,
+        content=body.content,
+        subject=body.subject,
+        created_at=now,
+    )
+
+
+@app.get("/assignments", response_model=AssignmentListResponse, tags=["Assignments"])
+async def list_assignments(
+    user_id: str = Query(..., description="User ID"),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
+):
+    """List all saved assignments for a user, newest first."""
+    db = await get_async_database()
+    col = db[COLLECTIONS["user_assignments"]]
+    total = await col.count_documents({"user_id": user_id})
+    docs = await col.find({"user_id": user_id})\
+        .sort("created_at", -1)\
+        .skip(skip).limit(limit).to_list(length=limit)
+
+    assignments = [
+        AssignmentResponse(
+            assignment_id=d["assignment_id"],
+            user_id=d["user_id"],
+            query=d["query"],
+            title=d.get("title", d["query"]),
+            content=d["content"],
+            subject=d.get("subject"),
+            created_at=d["created_at"],
+        )
+        for d in docs
+    ]
+    return AssignmentListResponse(total=total, assignments=assignments)
+
+
+@app.get("/assignments/{assignment_id}", response_model=AssignmentResponse, tags=["Assignments"])
+async def get_assignment(assignment_id: str, user_id: str = Query(...)):
+    """Get a single saved assignment by ID (must belong to requesting user)."""
+    db = await get_async_database()
+    doc = await db[COLLECTIONS["user_assignments"]].find_one(
+        {"assignment_id": assignment_id, "user_id": user_id}
+    )
+    if not doc:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+    return AssignmentResponse(
+        assignment_id=doc["assignment_id"],
+        user_id=doc["user_id"],
+        query=doc["query"],
+        title=doc.get("title", doc["query"]),
+        content=doc["content"],
+        subject=doc.get("subject"),
+        created_at=doc["created_at"],
+    )
+
+
+@app.get("/dashboard/summary", response_model=DashboardSummaryResponse, tags=["Dashboard"])
+async def dashboard_summary(user_id: str = Query(..., description="User ID")):
+    """
+    Aggregated personalized dashboard payload for learner UI.
+    Includes totals, weak topics, recent topics, and chart-friendly distributions.
+    """
+    db = await get_async_database()
+    sessions_col = db[COLLECTIONS["mcq_sessions"]]
+    mcqs_col = db[COLLECTIONS["mcqs"]]
+    assignments_col = db[COLLECTIONS["user_assignments"]]
+    chats_col = db[COLLECTIONS["chat_sessions"]]
+
+    total_mcqs = await mcqs_col.count_documents({"user_id": user_id})
+    total_assignments = await assignments_col.count_documents({"user_id": user_id})
+    total_chat_sessions = await chats_col.count_documents({"user_id": user_id})
+
+    diff_pipeline = [
+        {"$match": {"user_id": user_id}},
+        {"$group": {"_id": "$metadata.difficulty", "value": {"$sum": 1}}},
+    ]
+    diff_rows = await mcqs_col.aggregate(diff_pipeline).to_list(length=20)
+    diff_map = {str(r.get("_id") or "unknown"): int(r.get("value") or 0) for r in diff_rows}
+    difficulty_distribution = [
+        DashboardSlice(label="easy", value=diff_map.get("easy", 0)),
+        DashboardSlice(label="medium", value=diff_map.get("medium", 0)),
+        DashboardSlice(label="hard", value=diff_map.get("hard", 0)),
+    ]
+
+    subject_pipeline = [
+        {"$match": {"user_id": user_id}},
+        {"$group": {"_id": "$subject", "value": {"$sum": 1}}},
+        {"$sort": {"value": -1}},
+        {"$limit": 8},
+    ]
+    subject_rows = await mcqs_col.aggregate(subject_pipeline).to_list(length=8)
+    subject_distribution = [
+        DashboardSlice(label=str(r.get("_id") or "Unknown"), value=int(r.get("value") or 0))
+        for r in subject_rows
+    ]
+
+    recent_mcqs = await mcqs_col.find({"user_id": user_id}) \
+        .sort("created_at", -1).limit(120).to_list(length=120)
+
+    recent_topics_map: Dict[str, Dict[str, Any]] = {}
+    mcq_topic_counts: Dict[str, int] = {}
+    for d in recent_mcqs:
+        topic_label = _safe_topic_label(d.get("topic"), d.get("sub_topic"), d.get("chapter"))
+        mcq_topic_counts[topic_label] = mcq_topic_counts.get(topic_label, 0) + 1
+        if topic_label not in recent_topics_map:
+            recent_topics_map[topic_label] = {
+                "topic": d.get("topic") or d.get("chapter") or "General",
+                "sub_topic": d.get("sub_topic"),
+                "last_seen": d.get("created_at") or datetime.utcnow(),
+                "mcq_count": 0,
+            }
+        recent_topics_map[topic_label]["mcq_count"] += 1
+        if (d.get("created_at") or datetime.utcnow()) > recent_topics_map[topic_label]["last_seen"]:
+            recent_topics_map[topic_label]["last_seen"] = d.get("created_at") or datetime.utcnow()
+
+    recent_topics = [
+        DashboardRecentTopic(
+            topic=v["topic"],
+            sub_topic=v.get("sub_topic"),
+            last_seen=v["last_seen"],
+            mcq_count=int(v["mcq_count"]),
+        )
+        for v in sorted(recent_topics_map.values(), key=lambda x: x["last_seen"], reverse=True)[:8]
+    ]
+
+    sessions = await sessions_col.find({"user_id": user_id}) \
+        .sort("created_at", -1).limit(120).to_list(length=120)
+    weak_topics = _build_dashboard_weak_topics(sessions, mcq_topic_counts)
+    if not weak_topics:
+        # Fallback: if no session-level attempt summaries, derive from topic frequency only.
+        for topic_label, count in sorted(mcq_topic_counts.items(), key=lambda x: x[1], reverse=True)[:8]:
+            weak_topics.append(
+                DashboardWeakTopic(topic=topic_label, score=round(min(1.0, count / 10), 3), attempts=count, wrong_answers=0)
+            )
+
+    return DashboardSummaryResponse(
+        user_id=user_id,
+        generated_at=datetime.utcnow(),
+        totals=DashboardTotals(
+            total_mcqs=total_mcqs,
+            total_assignments=total_assignments,
+            total_chat_sessions=total_chat_sessions,
+        ),
+        difficulty_distribution=difficulty_distribution,
+        subject_distribution=subject_distribution,
+        weak_topics=weak_topics,
+        recent_topics=recent_topics,
+    )
+
+
+# ============================================================================
+# Video Library Endpoints
+# ============================================================================
+
+@app.post("/videos", response_model=VideoResponse, tags=["Videos"])
+async def save_video(body: VideoSave):
+    """Save a Manim video session (scenes + query) for a user."""
+    db = await get_async_database()
+    now = datetime.utcnow()
+    video_id = str(uuid.uuid4())
+    doc = {
+        "video_id": video_id,
+        "user_id": body.user_id,
+        "title": body.title,
+        "original_query": body.original_query,
+        "scenes": [s.dict() for s in body.scenes],
+        "created_at": now,
+    }
+    await db[COLLECTIONS["user_videos"]].insert_one(doc)
+    return VideoResponse(
+        video_id=video_id,
+        user_id=body.user_id,
+        title=body.title,
+        original_query=body.original_query,
+        scenes=body.scenes,
+        created_at=now,
+    )
+
+
+@app.get("/videos", response_model=VideoListResponse, tags=["Videos"])
+async def list_videos(
+    user_id: str = Query(..., description="User ID"),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
+):
+    """List all saved video sessions for a user, newest first."""
+    db = await get_async_database()
+    col = db[COLLECTIONS["user_videos"]]
+    total = await col.count_documents({"user_id": user_id})
+    docs = await col.find({"user_id": user_id}) \
+        .sort("created_at", -1).skip(skip).limit(limit).to_list(length=limit)
+    videos = [
+        VideoResponse(
+            video_id=d["video_id"],
+            user_id=d["user_id"],
+            title=d.get("title", d["original_query"]),
+            original_query=d["original_query"],
+            scenes=[VideoScene(**s) for s in d.get("scenes", [])],
+            created_at=d["created_at"],
+        )
+        for d in docs
+    ]
+    return VideoListResponse(total=total, videos=videos)
+
+
+@app.get("/videos/{video_id}", response_model=VideoResponse, tags=["Videos"])
+async def get_video(video_id: str, user_id: str = Query(...)):
+    """Get a single saved video session by ID."""
+    db = await get_async_database()
+    doc = await db[COLLECTIONS["user_videos"]].find_one(
+        {"video_id": video_id, "user_id": user_id}
+    )
+    if not doc:
+        raise HTTPException(status_code=404, detail="Video not found")
+    return VideoResponse(
+        video_id=doc["video_id"],
+        user_id=doc["user_id"],
+        title=doc.get("title", doc["original_query"]),
+        original_query=doc["original_query"],
+        scenes=[VideoScene(**s) for s in doc.get("scenes", [])],
+        created_at=doc["created_at"],
+    )
+
+
+@app.delete("/videos/{video_id}", tags=["Videos"])
+async def delete_video(video_id: str, user_id: str = Query(...)):
+    """Delete a saved video session."""
+    db = await get_async_database()
+    result = await db[COLLECTIONS["user_videos"]].delete_one(
+        {"video_id": video_id, "user_id": user_id}
+    )
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Video not found")
+    return {"ok": True, "deleted": video_id}
+
+
+# ============================================================================
+# Community Endpoints
+# ============================================================================
+
+@app.post("/community/posts", response_model=CommunityPostResponse, tags=["Community"])
+async def create_community_post(body: CommunityPostCreate):
+    """Share a post to the community."""
+    db = await get_async_database()
+    now = datetime.utcnow()
+    post_id = str(uuid.uuid4())
+    doc = {
+        "post_id": post_id,
+        "user_id": body.user_id,
+        "author_name": body.author_name,
+        "post_type": body.post_type,
+        "title": body.title,
+        "content": body.content,
+        "topic": body.topic,
+        "sub_topic": body.sub_topic,
+        "likes": [],
+        "dislikes": [],
+        "comments": [],
+        "created_at": now,
+    }
+    await db[COLLECTIONS["community_posts"]].insert_one(doc)
+    return CommunityPostResponse(**{k: v for k, v in doc.items() if k != "_id"})
+
+
+@app.get("/community/posts", response_model=CommunityPostListResponse, tags=["Community"])
+async def list_community_posts(
+    post_type: Optional[str] = Query(None, description="Filter by type: mcq, assignment, video"),
+    topic: Optional[str] = Query(None),
+    sub_topic: Optional[str] = Query(None),
+    q: Optional[str] = Query(None, description="Free-text search"),
+    sort_by: str = Query("date", description="Sort field: date or likes"),
+    order: str = Query("desc", description="asc or desc"),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=100),
+):
+    """List community posts with optional filtering and sorting."""
+    db = await get_async_database()
+    col = db[COLLECTIONS["community_posts"]]
+
+    query_filter: Dict[str, Any] = {}
+    if post_type:
+        query_filter["post_type"] = post_type
+    if topic:
+        query_filter["topic"] = {"$regex": topic, "$options": "i"}
+    if sub_topic:
+        query_filter["sub_topic"] = {"$regex": sub_topic, "$options": "i"}
+    if q:
+        query_filter["$text"] = {"$search": q}
+
+    sort_dir = -1 if order == "desc" else 1
+    if sort_by == "likes":
+        sort_field = [("likes_count", sort_dir), ("created_at", -1)]
+        pipeline = [
+            {"$match": query_filter},
+            {"$addFields": {"likes_count": {"$size": "$likes"}}},
+            {"$sort": {"likes_count": sort_dir, "created_at": -1}},
+            {"$skip": skip},
+            {"$limit": limit},
+        ]
+        count_pipeline = [{"$match": query_filter}, {"$count": "total"}]
+        count_result = await col.aggregate(count_pipeline).to_list(length=1)
+        total = count_result[0]["total"] if count_result else 0
+        docs = await col.aggregate(pipeline).to_list(length=limit)
+    else:
+        total = await col.count_documents(query_filter)
+        docs = await col.find(query_filter) \
+            .sort("created_at", sort_dir).skip(skip).limit(limit).to_list(length=limit)
+
+    posts = []
+    for d in docs:
+        posts.append(CommunityPostResponse(
+            post_id=d["post_id"],
+            user_id=d["user_id"],
+            author_name=d.get("author_name", ""),
+            post_type=d["post_type"],
+            title=d.get("title", ""),
+            content=d.get("content", ""),
+            topic=d.get("topic", ""),
+            sub_topic=d.get("sub_topic", ""),
+            likes=d.get("likes", []),
+            dislikes=d.get("dislikes", []),
+            comments=[CommunityComment(**c) for c in d.get("comments", [])],
+            created_at=d["created_at"],
+        ))
+    return CommunityPostListResponse(total=total, posts=posts)
+
+
+@app.get("/community/posts/{post_id}", response_model=CommunityPostResponse, tags=["Community"])
+async def get_community_post(post_id: str):
+    """Get a single community post."""
+    db = await get_async_database()
+    doc = await db[COLLECTIONS["community_posts"]].find_one({"post_id": post_id})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Post not found")
+    return CommunityPostResponse(
+        post_id=doc["post_id"],
+        user_id=doc["user_id"],
+        author_name=doc.get("author_name", ""),
+        post_type=doc["post_type"],
+        title=doc.get("title", ""),
+        content=doc.get("content", ""),
+        topic=doc.get("topic", ""),
+        sub_topic=doc.get("sub_topic", ""),
+        likes=doc.get("likes", []),
+        dislikes=doc.get("dislikes", []),
+        comments=[CommunityComment(**c) for c in doc.get("comments", [])],
+        created_at=doc["created_at"],
+    )
+
+
+@app.post("/community/posts/{post_id}/like", response_model=CommunityPostResponse, tags=["Community"])
+async def toggle_like_post(post_id: str, body: CommunityLikeRequest):
+    """Toggle like on a community post. Removes dislike if present."""
+    db = await get_async_database()
+    col = db[COLLECTIONS["community_posts"]]
+    doc = await col.find_one({"post_id": post_id})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Post not found")
+
+    uid = body.user_id
+    likes = doc.get("likes", [])
+    dislikes = [d for d in doc.get("dislikes", []) if d != uid]
+    if uid in likes:
+        likes = [l for l in likes if l != uid]
+    else:
+        likes = [l for l in likes if l != uid] + [uid]
+
+    updated = await col.find_one_and_update(
+        {"post_id": post_id},
+        {"$set": {"likes": likes, "dislikes": dislikes}},
+        return_document=ReturnDocument.AFTER,
+    )
+    return CommunityPostResponse(
+        post_id=updated["post_id"], user_id=updated["user_id"],
+        author_name=updated.get("author_name", ""), post_type=updated["post_type"],
+        title=updated.get("title", ""), content=updated.get("content", ""),
+        topic=updated.get("topic", ""), sub_topic=updated.get("sub_topic", ""),
+        likes=updated.get("likes", []), dislikes=updated.get("dislikes", []),
+        comments=[CommunityComment(**c) for c in updated.get("comments", [])],
+        created_at=updated["created_at"],
+    )
+
+
+@app.post("/community/posts/{post_id}/dislike", response_model=CommunityPostResponse, tags=["Community"])
+async def toggle_dislike_post(post_id: str, body: CommunityLikeRequest):
+    """Toggle dislike on a community post. Removes like if present."""
+    db = await get_async_database()
+    col = db[COLLECTIONS["community_posts"]]
+    doc = await col.find_one({"post_id": post_id})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Post not found")
+
+    uid = body.user_id
+    dislikes = doc.get("dislikes", [])
+    likes = [l for l in doc.get("likes", []) if l != uid]
+    if uid in dislikes:
+        dislikes = [d for d in dislikes if d != uid]
+    else:
+        dislikes = [d for d in dislikes if d != uid] + [uid]
+
+    updated = await col.find_one_and_update(
+        {"post_id": post_id},
+        {"$set": {"likes": likes, "dislikes": dislikes}},
+        return_document=ReturnDocument.AFTER,
+    )
+    return CommunityPostResponse(
+        post_id=updated["post_id"], user_id=updated["user_id"],
+        author_name=updated.get("author_name", ""), post_type=updated["post_type"],
+        title=updated.get("title", ""), content=updated.get("content", ""),
+        topic=updated.get("topic", ""), sub_topic=updated.get("sub_topic", ""),
+        likes=updated.get("likes", []), dislikes=updated.get("dislikes", []),
+        comments=[CommunityComment(**c) for c in updated.get("comments", [])],
+        created_at=updated["created_at"],
+    )
+
+
+@app.post("/community/posts/{post_id}/comments", response_model=CommunityPostResponse, tags=["Community"])
+async def add_comment(post_id: str, body: CommunityCommentCreate):
+    """Add a comment to a community post."""
+    db = await get_async_database()
+    col = db[COLLECTIONS["community_posts"]]
+    doc = await col.find_one({"post_id": post_id})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Post not found")
+
+    comment = {
+        "comment_id": str(uuid.uuid4()),
+        "user_id": body.user_id,
+        "author_name": body.author_name,
+        "body": body.body,
+        "created_at": datetime.utcnow(),
+    }
+    updated = await col.find_one_and_update(
+        {"post_id": post_id},
+        {"$push": {"comments": comment}},
+        return_document=ReturnDocument.AFTER,
+    )
+    return CommunityPostResponse(
+        post_id=updated["post_id"], user_id=updated["user_id"],
+        author_name=updated.get("author_name", ""), post_type=updated["post_type"],
+        title=updated.get("title", ""), content=updated.get("content", ""),
+        topic=updated.get("topic", ""), sub_topic=updated.get("sub_topic", ""),
+        likes=updated.get("likes", []), dislikes=updated.get("dislikes", []),
+        comments=[CommunityComment(**c) for c in updated.get("comments", [])],
+        created_at=updated["created_at"],
+    )
+
+
+@app.delete("/community/posts/{post_id}/comments/{comment_id}", response_model=CommunityPostResponse, tags=["Community"])
+async def delete_comment(post_id: str, comment_id: str, user_id: str = Query(...)):
+    """Remove a comment (only the comment author can delete)."""
+    db = await get_async_database()
+    col = db[COLLECTIONS["community_posts"]]
+    doc = await col.find_one({"post_id": post_id})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Post not found")
+
+    comment = next((c for c in doc.get("comments", []) if c.get("comment_id") == comment_id), None)
+    if not comment:
+        raise HTTPException(status_code=404, detail="Comment not found")
+    if comment.get("user_id") != user_id:
+        raise HTTPException(status_code=403, detail="Not your comment")
+
+    updated = await col.find_one_and_update(
+        {"post_id": post_id},
+        {"$pull": {"comments": {"comment_id": comment_id}}},
+        return_document=ReturnDocument.AFTER,
+    )
+    return CommunityPostResponse(
+        post_id=updated["post_id"], user_id=updated["user_id"],
+        author_name=updated.get("author_name", ""), post_type=updated["post_type"],
+        title=updated.get("title", ""), content=updated.get("content", ""),
+        topic=updated.get("topic", ""), sub_topic=updated.get("sub_topic", ""),
+        likes=updated.get("likes", []), dislikes=updated.get("dislikes", []),
+        comments=[CommunityComment(**c) for c in updated.get("comments", [])],
+        created_at=updated["created_at"],
+    )
+
+
+@app.delete("/community/posts/{post_id}", tags=["Community"])
+async def delete_community_post(post_id: str, user_id: str = Query(...)):
+    """Delete a community post (only the post author can delete)."""
+    db = await get_async_database()
+    col = db[COLLECTIONS["community_posts"]]
+    doc = await col.find_one({"post_id": post_id})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Post not found")
+    if doc.get("user_id") != user_id:
+        raise HTTPException(status_code=403, detail="Not your post")
+    await col.delete_one({"post_id": post_id})
+    return {"ok": True, "deleted": post_id}
 
 
 if __name__ == "__main__":

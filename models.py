@@ -89,6 +89,8 @@ class MCQDocument(BaseModel):
     user_id: Optional[str] = None
     subject: str
     chapter: str
+    topic: Optional[str] = None
+    sub_topic: Optional[str] = None
     generation_query: Optional[str] = None
     question_number: int
     concept_id: str
@@ -144,8 +146,11 @@ class MCQResponse(BaseModel):
     """Response model for individual MCQ"""
     id: str
     session_id: str
+    user_id: Optional[str] = None
     subject: str
     chapter: str
+    topic: Optional[str] = None
+    sub_topic: Optional[str] = None
     question_number: int
     concept_id: str
     stem: str
@@ -262,3 +267,207 @@ class FlashcardFeedbackResponse(BaseModel):
     memory_source: Optional[str] = None
     summary_generated: bool = False
     summary_length: int = 0
+
+
+# ============================================================================
+# Chat Session Models
+# ============================================================================
+
+class ChatSessionUpsert(BaseModel):
+    """Request body for creating/updating a chat session."""
+    session_id: str = Field(..., description="Frontend-generated unique chat ID")
+    user_id: str = Field(..., description="Authenticated user ID")
+    title: str = Field(default="New chat")
+    messages: List[dict] = Field(default_factory=list)
+
+
+class ChatSessionResponse(BaseModel):
+    """Response for a single chat session."""
+    session_id: str
+    user_id: str
+    title: str
+    messages: List[dict]
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        json_encoders = {datetime: lambda v: v.isoformat()}
+
+
+class ChatSessionListResponse(BaseModel):
+    total: int
+    sessions: List[ChatSessionResponse]
+
+
+class ChatSessionRename(BaseModel):
+    """Request body for chat rename/title updates."""
+    user_id: str
+    title: str = Field(..., min_length=1, max_length=120)
+
+
+# ============================================================================
+# Assignment Models
+# ============================================================================
+
+class AssignmentSave(BaseModel):
+    """Request body for saving assignment text."""
+    user_id: str
+    query: str
+    title: str
+    content: str
+    subject: Optional[str] = None
+
+
+class AssignmentResponse(BaseModel):
+    """Response for a single saved assignment."""
+    assignment_id: str
+    user_id: str
+    query: str
+    title: str
+    content: str
+    subject: Optional[str] = None
+    created_at: datetime
+
+    class Config:
+        json_encoders = {datetime: lambda v: v.isoformat()}
+
+
+class AssignmentListResponse(BaseModel):
+    total: int
+    assignments: List[AssignmentResponse]
+
+
+# ============================================================================
+# Dashboard Models
+# ============================================================================
+
+class DashboardTotals(BaseModel):
+    total_mcqs: int = 0
+    total_assignments: int = 0
+    total_chat_sessions: int = 0
+
+
+class DashboardSlice(BaseModel):
+    label: str
+    value: int
+
+
+class DashboardWeakTopic(BaseModel):
+    topic: str
+    score: float
+    attempts: int
+    wrong_answers: int
+
+
+class DashboardRecentTopic(BaseModel):
+    topic: str
+    sub_topic: Optional[str] = None
+    last_seen: datetime
+    mcq_count: int = 0
+
+    class Config:
+        json_encoders = {datetime: lambda v: v.isoformat()}
+
+
+class DashboardSummaryResponse(BaseModel):
+    user_id: str
+    generated_at: datetime
+    totals: DashboardTotals
+    difficulty_distribution: List[DashboardSlice]
+    subject_distribution: List[DashboardSlice]
+    weak_topics: List[DashboardWeakTopic]
+    recent_topics: List[DashboardRecentTopic]
+
+    class Config:
+        json_encoders = {datetime: lambda v: v.isoformat()}
+
+
+# ============================================================================
+# Video Library Models
+# ============================================================================
+
+class VideoScene(BaseModel):
+    filename: str
+    explanation: str = ""
+
+
+class VideoSave(BaseModel):
+    user_id: str
+    title: str
+    original_query: str
+    scenes: List[VideoScene]
+
+
+class VideoResponse(BaseModel):
+    video_id: str
+    user_id: str
+    title: str
+    original_query: str
+    scenes: List[VideoScene]
+    created_at: datetime
+
+    class Config:
+        json_encoders = {datetime: lambda v: v.isoformat()}
+
+
+class VideoListResponse(BaseModel):
+    total: int
+    videos: List[VideoResponse]
+
+
+# ============================================================================
+# Community Models
+# ============================================================================
+
+class CommunityComment(BaseModel):
+    comment_id: str
+    user_id: str
+    author_name: str
+    body: str
+    created_at: datetime
+
+    class Config:
+        json_encoders = {datetime: lambda v: v.isoformat()}
+
+
+class CommunityPostCreate(BaseModel):
+    user_id: str
+    author_name: str
+    post_type: Literal["mcq", "assignment", "video"]
+    title: str
+    content: str
+    topic: str = ""
+    sub_topic: str = ""
+
+
+class CommunityPostResponse(BaseModel):
+    post_id: str
+    user_id: str
+    author_name: str
+    post_type: str
+    title: str
+    content: str
+    topic: str = ""
+    sub_topic: str = ""
+    likes: List[str] = []
+    dislikes: List[str] = []
+    comments: List[CommunityComment] = []
+    created_at: datetime
+
+    class Config:
+        json_encoders = {datetime: lambda v: v.isoformat()}
+
+
+class CommunityPostListResponse(BaseModel):
+    total: int
+    posts: List[CommunityPostResponse]
+
+
+class CommunityLikeRequest(BaseModel):
+    user_id: str
+
+
+class CommunityCommentCreate(BaseModel):
+    user_id: str
+    author_name: str
+    body: str
