@@ -5,7 +5,7 @@ These models define the structure for API endpoints and database storage.
 """
 
 from datetime import datetime
-from typing import List, Dict, Optional, Literal
+from typing import Any, List, Dict, Optional, Literal
 from pydantic import BaseModel, Field
 from bson import ObjectId
 
@@ -279,6 +279,8 @@ class ChatSessionUpsert(BaseModel):
     user_id: str = Field(..., description="Authenticated user ID")
     title: str = Field(default="New chat")
     messages: List[dict] = Field(default_factory=list)
+    # MCP Hub Manim /video workspace (scenes, manim_chat_id, rendered previews, etc.)
+    video_state: Optional[Dict[str, Any]] = None
 
 
 class ChatSessionResponse(BaseModel):
@@ -289,6 +291,7 @@ class ChatSessionResponse(BaseModel):
     messages: List[dict]
     created_at: datetime
     updated_at: datetime
+    video_state: Optional[Dict[str, Any]] = None
 
     class Config:
         json_encoders = {datetime: lambda v: v.isoformat()}
@@ -396,6 +399,7 @@ class VideoSave(BaseModel):
     title: str
     original_query: str
     scenes: List[VideoScene]
+    manim_chat_id: Optional[str] = None
 
 
 class VideoResponse(BaseModel):
@@ -405,6 +409,7 @@ class VideoResponse(BaseModel):
     original_query: str
     scenes: List[VideoScene]
     created_at: datetime
+    manim_chat_id: Optional[str] = None
 
     class Config:
         json_encoders = {datetime: lambda v: v.isoformat()}

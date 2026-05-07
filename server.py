@@ -1623,9 +1623,12 @@ async def upsert_chat_session(body: ChatSessionUpsert):
         "messages": body.messages,
         "updated_at": now,
     }
+    if body.video_state is not None:
+        doc["video_state"] = body.video_state
+    set_payload = {k: v for k, v in doc.items() if k != "session_id"}
     result = await col.find_one_and_update(
         {"session_id": body.session_id, "user_id": body.user_id},
-        {"$set": {k: v for k, v in doc.items() if k != "session_id"},
+        {"$set": set_payload,
          "$setOnInsert": {"created_at": now}},
         upsert=True,
         return_document=ReturnDocument.AFTER,
@@ -1640,6 +1643,7 @@ async def upsert_chat_session(body: ChatSessionUpsert):
         messages=result.get("messages", []),
         created_at=result.get("created_at", now),
         updated_at=result.get("updated_at", now),
+        video_state=result.get("video_state"),
     )
 
 
@@ -1665,6 +1669,7 @@ async def list_chat_sessions(
             messages=d.get("messages", []),
             created_at=d.get("created_at", d.get("updated_at", datetime.utcnow())),
             updated_at=d.get("updated_at", datetime.utcnow()),
+            video_state=d.get("video_state"),
         )
         for d in docs
     ]
@@ -1688,6 +1693,7 @@ async def get_chat_session(session_id: str, user_id: str = Query(...)):
         messages=doc.get("messages", []),
         created_at=doc.get("created_at", now),
         updated_at=doc.get("updated_at", now),
+        video_state=doc.get("video_state"),
     )
 
 
@@ -1716,6 +1722,7 @@ async def rename_chat_session(session_id: str, body: ChatSessionRename):
         messages=updated.get("messages", []),
         created_at=updated.get("created_at", now),
         updated_at=updated.get("updated_at", now),
+        video_state=updated.get("video_state"),
     )
 
 
@@ -1921,6 +1928,7 @@ async def save_video(body: VideoSave):
         "original_query": body.original_query,
         "scenes": [s.dict() for s in body.scenes],
         "created_at": now,
+        "manim_chat_id": body.manim_chat_id,
     }
     await db[COLLECTIONS["user_videos"]].insert_one(doc)
     return VideoResponse(
@@ -1930,6 +1938,7 @@ async def save_video(body: VideoSave):
         original_query=body.original_query,
         scenes=body.scenes,
         created_at=now,
+        manim_chat_id=body.manim_chat_id,
     )
 
 
@@ -1953,6 +1962,7 @@ async def list_videos(
             original_query=d["original_query"],
             scenes=[VideoScene(**s) for s in d.get("scenes", [])],
             created_at=d["created_at"],
+            manim_chat_id=d.get("manim_chat_id"),
         )
         for d in docs
     ]
@@ -1975,6 +1985,7 @@ async def get_video(video_id: str, user_id: str = Query(...)):
         original_query=doc["original_query"],
         scenes=[VideoScene(**s) for s in doc.get("scenes", [])],
         created_at=doc["created_at"],
+        manim_chat_id=doc.get("manim_chat_id"),
     )
 
 
