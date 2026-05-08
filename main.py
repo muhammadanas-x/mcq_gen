@@ -22,7 +22,7 @@ class MCQGenerator:
     def __init__(
         self,
         llm_provider: Literal["anthropic", "openai", "gemini", "groq"] = "openai",
-        model: str = "nvidia/nemotron-3-super-120b-a12b:free",
+        model: str = "google/gemini-2.5-flash",
         batch_size: int = 15
     ):
         """
@@ -161,7 +161,7 @@ def main():
     
     parser.add_argument(
         "--model",
-        default="gemini-2.5-pro",
+        default="google/gemini-2.5-flash",
         help="Model name (e.g., gemini-2.5-pro, claude-3-5-sonnet-20241022, gpt-4)"
     )
     

@@ -241,7 +241,7 @@ def save_analyzer_intermediate_data(concepts: List[ConceptJSON], state: MCQGener
         f.write(f"Input Source: {state['input_source']}\n")
         f.write(f"Input Type: {state['input_type']}\n")
         f.write(f"LLM Provider: {state['config'].get('llm_provider', 'gemini')}\n")
-        f.write(f"Model: {state['config'].get('model', 'gemini-2.5-pro')}\n")
+        f.write(f"Model: {state['config'].get('model', 'google/gemini-2.5-flash')}\n")
         f.write(f"Total Concepts Extracted: {len(concepts)}\n")
         f.write("=" * 80 + "\n\n")
         
@@ -299,7 +299,7 @@ def content_analyzer_node(state: MCQGeneratorState) -> Dict:
     print("="*60)
     # Initialize LLM based on config
     llm_provider = state["config"].get("llm_provider", "openai")
-    model = state["config"].get("model", "nvidia/nemotron-3-super-120b-a12b:free")
+    model = state["config"].get("model", "google/gemini-2.5-flash")
     
     if llm_provider == "anthropic":
         llm = ChatAnthropic(model=model, temperature=0.3)
